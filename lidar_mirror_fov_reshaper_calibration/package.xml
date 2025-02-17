@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+    <name>lidar_mirror_fov_reshaper_calibration</name>
+    <version>1.0.0</version>
+    <description>Calibration of mirror poses (online, offline)</description>
+    <maintainer email="devAndreas@proton.me">Andreas Loeffler</maintainer>
+    <license>Apache License 2.0</license>
+
+    <buildtool_depend>ament_cmake</buildtool_depend>
+
+    <depend>ament_index_cpp</depend>
+    <depend>pcl_conversions</depend>
+    <depend>rclcpp</depend>
+    <depend>sensor_msgs</depend>
+    <depend>pcl_ros</depend>
+    <depend>visualization_msgs</depend>
+    <depend>tf2</depend>
+    <depend>tf2_ros</depend>
+
+    <depend>libnlopt-dev</depend>
+
+    <exec_depend>rviz_common</exec_depend>
+    <exec_depend>rviz_default_plugins</exec_depend>
+    <test_depend>ament_lint_auto</test_depend>
+    <test_depend>ament_lint_common</test_depend>
+
+    <export>
+        <build_type>ament_cmake</build_type>
+    </export>
+</package>

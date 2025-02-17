@@ -1,0 +1,38 @@
+/lidar_mirror_fov_reshaper_runtime: # for any further parameter description, please checkout/build the documentation
+  ros__parameters:
+    laser_scanner:
+      laser_topic: "cloud"
+      laser_frame: "cloud"
+      angle_min: -2.35619 # [rad]
+      angle_max: 2.35619 # [rad]
+      use_poincloud_input: true # if false, laserscan input is being used
+
+    visualization:
+      pub_front: false # unmirrored originial FOV front area
+      pub_transformed_left_mirror: true # transformed pointcloud of left mirror
+      pub_transformed_right_mirror: true # transformed pointcloud of right mirror
+      pub_transformed_all_combined: true # all mirrored+transformed and unmirrored pointclouds combined in 3D space
+      pub_front_topic: "lmfr_front"
+      pub_left_mirror_topic: "lmfr_transformed_lm"
+      pub_right_mirror_topic: "lmfr_transformed_rm"
+      pub_all_combined_topic: "lmfr_transformed_all"
+      remove_unused_points: true # remove points that are not in the FOV of any mirror by setting them to NaN
+
+    front:
+      start_angle: -45 # [deg], int
+      end_angle: 45 # [deg], int
+
+    # normal_vec and support_vec of both mirrors are either:
+    # calculated a priori via optimization (see lidar_mirror_fov_reshaper_calibration)
+    # known from a given CAD model
+    mirror_left:
+      start_angle: 100 # [deg], int
+      end_angle: 125 # [deg], int
+      normal_vec: [0.39866, -0.33, -0.335313]
+      support_vec: [-0.028539, 0.070636, 0.0]
+
+    mirror_right:
+      start_angle: -125 # [deg], int
+      end_angle: -100 # [deg], int
+      normal_vec: [0.361, 0.29, -0.291]
+      support_vec: [-0.031, -0.069, 0.0]
