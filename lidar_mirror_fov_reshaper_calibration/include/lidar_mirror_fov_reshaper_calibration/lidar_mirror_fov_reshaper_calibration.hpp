@@ -143,14 +143,19 @@ private:
   } typedef optimization_params;
 
   /**
-   * @brief 
-   * 
-   * @param n 
-   * @param x 
-   * @param grad 
-   * @param function_params 
-   * @return double 
-   */
+ * @brief Calculates the error function for the lidar mirror field of view (FOV) reshaping calibration.
+ * 
+ * This function evaluates the Root Mean Square (RMS) error based on various points (front, right mirror, left mirror) and their distances to a calibration plane. It also calculates reflection point errors and updates the calibration results with detailed RMS values.
+ *
+ * The optimization algorithm uses this error function to adjust mirror parameters for an optimal calibration.
+ * 
+ * @param n The number of parameters in the optimization (length of `x`).
+ * @param x Array of optimization parameters (support vectors and normal vectors of mirrors and plane).
+ * @param grad Array for storing the gradients of the error function (if required by the optimizer).
+ * @param function_params A pointer to the function parameters, including the lidar point clouds and calibration results.
+ * 
+ * @return double The computed RMS error for the calibration, summing up various error components including front, left mirror, and right mirror distances.
+ */
   static double errFnMirrorFix(unsigned n, const double * x, double * grad, void * function_params);
 
   void optimizeNonVerbose(
@@ -192,23 +197,28 @@ private:
     int verbose /* = 0 */, int no_batches /* = -1 */, int batch_size /* = -1 */);
 
   /**
-   * @brief 
-   * 
-   * @param opt_params
-   * @param plane_support_vec
-   * @param plane_normal_vec
-   * @param mirror_right_support_vec
-   * @param mirror_right_normal_vec
-   * @param mirror_left_support_vec
-   * @param mirror_left_normal_vec
-   * @param no_opt_params
-   * @param epsabs
-   * @param stepsize
-   * @param iter_max
-   * @param verbose
-   * @param no_batches
-   * @param batch_size
-   */
+ * @brief Perform optimization with verbose output, possibly in batches.
+ *
+ * This function performs the optimization process with verbose logging and optional batching of data.
+ * It splits the data into smaller batches and optimizes each batch independently before performing
+ * the final optimization on all data. The function outputs various optimization results such as RMS
+ * values, angle deviations, and the optimization status.
+ * 
+ * @param[in,out] opt_params The optimization parameters containing point clouds and constraints.
+ * @param[in,out] plane_support_vec The support vector of the plane.
+ * @param[in,out] plane_normal_vec The normal vector of the plane.
+ * @param[in,out] mirror_right_support_vec The support vector of the right mirror.
+ * @param[in,out] mirror_right_normal_vec The normal vector of the right mirror.
+ * @param[in,out] mirror_left_support_vec The support vector of the left mirror.
+ * @param[in,out] mirror_left_normal_vec The normal vector of the left mirror.
+ * @param[in] no_opt_params Number of optimization parameters (default is 18).
+ * @param[in] epsabs The absolute tolerance for optimization (default is 1e-5).
+ * @param[in] stepsize The step size for the optimization algorithm (default is 1e-3).
+ * @param[in] iter_max The maximum number of iterations for the optimization (default is 1000).
+ * @param[in] verbose Flag to enable or disable verbose logging (default is false).
+ * @param[in] no_batches The number of batches to split the data into (default is -1, indicating no batching).
+ * @param[in] batch_size The size of each batch (default is -1, indicating auto calculation based on data size).
+ */
   void optimizeVerbose(
     optimization_params & opt_params, std::vector<double> & plane_support_vec,
     std::vector<double> & plane_normal_vec, std::vector<double> & mirror_right_support_vec,
@@ -307,15 +317,15 @@ private:
    *
    * @param marker[in/out] marker object to be initialized
    * @param src_frame_id[in] frame id of marker
-   * @param ns[in] namespace of marker
    * @param id[in] marker id
    * @param position[in] position of marker in relation to src_frame_id
    * @param orientation[in] orientation of marker in relation to src_frame_id
    * @param rgba[in] rgba color coded vector
+   * @param scale[in] scale of the marker 
    */
   void initVectorVisualizer(
-    visualization_msgs::msg::Marker::SharedPtr marker, const char * src_frame_id, const char * ns,
-    int id, std::vector<double> & rgba);
+    visualization_msgs::msg::Marker::SharedPtr marker, const char * src_frame_id, int id,
+    std::vector<double> & rgba, double scale = 0.001);
 
   /**
    * @brief Calculate the current row index of a given csv file
@@ -351,10 +361,15 @@ private:
   void writeOptimizationResultsStats(std::ofstream & results_stats_file, std::string & method_name);
 
   /**
-   * @brief
-   *
-   * @param[out] opt_constraints Vector of optimization constraints
-   */
+ * @brief Initializes the optimization constraints for mirror orientation calibration.
+ * 
+ * This function sets up the optimization constraints based on the current configuration of mirror orientation and plane parameters. It populates the `opt_constraints` vector with boolean values indicating which parameters are subject to optimization. The constraints can be applied to the plane, right mirror, and left mirror based on the object's member variables.
+ * 
+ * If the optimization for mirror orientations is enabled, corresponding values in the `opt_constraints` vector will be set to `true`. Otherwise, they remain unchanged.
+ * 
+ * @param[out] opt_constraints A vector of boolean values representing the optimization constraints for the calibration. 
+ *                              The size of the vector should be at least 18, corresponding to the different parameters for the plane and the two mirrors.
+ */
   void initConstraints(std::vector<bool> * opt_constraints);
 
   /**
@@ -384,27 +399,35 @@ private:
     const pcl::PointCloud<pcl::PointXYZI> & src_cloud, int mirror = 0, int mode = 0);
 
   /**
-   * @brief 
-   * 
-   * @param[in] src_cloud 
-   * @param[in] inital_guess_min 
-   * @param[in] inital_guess_max
-   * @param[out] min_max_indices 
-   * @param[in] sliding_window_size Size of the sliding window used to eval the slope in the given window range. Defaults to 0. > 0 means using the elememnts +- sliding_window_size
-   */
+ * @brief Identifies mirror points based on the slope of the point cloud data.
+ * 
+ * This function processes the provided point cloud (`src_cloud`) and identifies potential mirror points by evaluating the slope within a sliding window across the cloud. The function calculates the slope at each point in the cloud, then determines the threshold for identifying jumps or significant changes in slope, which indicate the presence of mirror points. The threshold is based on the 95th percentile of slopes in the cloud.
+ * 
+ * The function modifies the internal mirror start and end angles for both the left and right mirrors, based on identified jumps in the slope.
+ * 
+ * @param[in] src_cloud The input point cloud containing the data to be processed.
+ * @param[in] inital_guess_min The minimum value used to filter the point cloud for initial guess.
+ * @param[in] inital_guess_max The maximum value used to filter the point cloud for initial guess.
+ * @param[out] min_max_indices The indices of the points in the cloud corresponding to the initial guess range (not used directly in the function, but indicated as an output).
+ * @param[in] sliding_window_size The size of the sliding window used to evaluate the slope in the given window range. Default value is 1. A value greater than 0 means that the elements +- `sliding_window_size` will be considered.
+ */
   void identifyMirrorPointsSlope(
     const pcl::PointCloud<pcl::PointXYZI> & src_cloud, double inital_guess_min,
     double inital_guess_max, int sliding_window_size = 1);
 
   /**
-   * @brief 
-   * 
-   * @param src_cloud 
-   * @param inital_guess_min 
-   * @param inital_guess_max 
-   * @param min_max_indices 
-   * @param apply_sigma 
-   */
+ * @brief Identifies mirror points based on the mean distance (range) and standard deviation.
+ * 
+ * This function processes the provided point cloud (`src_cloud`) and identifies mirror points by evaluating the mean and standard deviation of the distance (range) of points from the origin. It filters the points by checking if their distance falls within one standard deviation from the mean range. The function then calculates the new minimum and maximum indices for the mirror points based on this filtering process.
+ * 
+ * The `apply_sigma` parameter controls whether or not to apply the sigma (standard deviation) filtering.
+ * 
+ * @param[in] src_cloud The input point cloud containing the data to be processed.
+ * @param[in] inital_guess_min The minimum value used to filter the point cloud for initial guess.
+ * @param[in] inital_guess_max The maximum value used to filter the point cloud for initial guess.
+ * @param[out] min_max_indices The output indices representing the range of mirror points.
+ * @param[in] apply_sigma A flag to control whether to apply sigma (standard deviation) filtering. Default is false.
+ */
   void identifyMirrorPointsMeanDist(
     const pcl::PointCloud<pcl::PointXYZI> & src_cloud, double inital_guess_min,
     double inital_guess_max, pcl::PointIndices * min_max_indices, bool apply_sigma = false);
@@ -423,88 +446,108 @@ private:
   void printOptimizationResults(bool print_normal_vecs = false, bool print_support_vecs = false);
 
   /**
-   * @brief 
-   * 
-   * @param optimized_planes_viz 
-   */
+ * @brief Visualizes the optimized planes and mirrors using ROS markers.
+ * 
+ * This function visualizes the optimized calibration plane and the left and right mirrors as 3D markers in a ROS environment. The planes and mirrors are represented using their support vectors and the corresponding normal vectors. The visualization markers are created and added to the provided `MarkerArray` for display. Depending on the configuration, the markers are either published together or separately for the calibration plane, left mirror, and right mirror.
+ * 
+ * @param[in] optimized_planes_viz Shared pointer to the `MarkerArray` that holds the 3D markers for the optimized planes and mirrors.
+ */
   void visualizeOptimizedPlanes(
     visualization_msgs::msg::MarkerArray::SharedPtr optimized_planes_viz);
 
   /**
-   * @brief 
-   * 
-   * @param opt_result 
-   */
+ * @brief Visualizes the normal vectors for the left mirror, right mirror, and calibration plane.
+ * 
+ * This function visualizes the normal vectors for the left and right mirrors as well as the calibration plane in a ROS environment. The normal vectors are visualized as 3D arrows in the point cloud coordinate system. The roll, pitch, and yaw angles of the normal vectors are computed and stored in the provided `opt_result` object for later use. The normal vectors are displayed using markers and can be published based on the configuration.
+ * 
+ * @param[in] opt_result A reference to the `optimization_result` object where the roll, pitch, and yaw values for the left and right mirror normal vectors are stored.
+ */
   void visualizeNormalVectors(optimization_result & opt_result);
 
   /**
-   * @brief 
-   * 
-   * @param transformed_cloud_all 
-   * @param transformed_cloud_rm 
-   * @param transformed_cloud_lm 
-   */
+ * @brief Visualizes and publishes transformed point clouds for the combined, left mirror, and right mirror data.
+ * 
+ * This function publishes the transformed point clouds for the entire set, as well as for the left and right mirrors, as ROS `PointCloud2` messages. It checks the sizes of the transformed point clouds to ensure they match the expected dimensions based on the coverage area of the mirrors. If the point cloud sizes are inconsistent, an error message is logged. The point clouds are then converted to the ROS format and published to their respective topics.
+ * 
+ * @param[in] transformed_cloud_all The transformed point cloud representing the entire dataset, including the left and right mirrors.
+ * @param[in] transformed_cloud_rm The transformed point cloud for the right mirror.
+ * @param[in] transformed_cloud_lm The transformed point cloud for the left mirror.
+ */
   void visualizeTransformedPointclouds(
     pcl::PointCloud<pcl::PointXYZI> & transformed_cloud_all,
     pcl::PointCloud<pcl::PointXYZI> & transformed_cloud_rm,
     pcl::PointCloud<pcl::PointXYZI> & transformed_cloud_lm);
 
   /**
-   * @brief 
-   * 
-   * @param p1 
-   * @param p2 
-   * @param t 
-   * @param intensity 
-   * @return pcl::PointXYZI 
-   */
+ * @brief Interpolates between two points and assigns a given intensity to the resulting point.
+ * 
+ * This function performs linear interpolation between two `pcl::PointXYZI` points, `p1` and `p2`, based on the interpolation parameter `t` (where `t` ranges from 0 to 1). The resulting interpolated point is calculated by linearly interpolating the x, y, and z coordinates of the two input points. The intensity of the resulting point is set to the given `intensity` value.
+ * 
+ * @param[in] p1 The first point, used as the starting point for interpolation.
+ * @param[in] p2 The second point, used as the ending point for interpolation.
+ * @param[in] t The interpolation factor, where 0 results in `p1` and 1 results in `p2`.
+ * @param[in] intensity The intensity value to assign to the interpolated point.
+ * 
+ * @return A new `pcl::PointXYZI` point that is the result of the interpolation, with the specified intensity.
+ */
   pcl::PointXYZI interpolate(
     const pcl::PointXYZI & p1, const pcl::PointXYZI & p2, float t, double intensity);
 
   /**
-   * @brief 
-   * 
-   */
+ * @brief Averages point clouds from various buffers to create a single averaged point cloud.
+ * 
+ * This function performs averaging of point clouds stored in different buffers: left mirror, right mirror, front, and general buffers. It checks if the buffers have accumulated the required number of point clouds (defined by `averaging_n_clouds`). If the buffer size matches, the function sums the points from all the clouds and then divides by the total number of clouds to compute the average. If the buffer size does not match the expected size, the function will log an error and shut down. After averaging, the function pushes the averaged point clouds back into the respective buffers.
+ * 
+ * The function also ensures that the point clouds in the buffers are aligned and of equal size before performing averaging, and if the buffer sizes do not match, the program shuts down to avoid incorrect processing.
+ * 
+ * @return void
+ */
   void averagingResourceBuffers();
 
   /**
-   * @brief 
-   * 
-   */
-  void averagingScan();
-
-  /**
-   * @brief 
-   * 
-   * @param algo 
-   * @return std::string 
-   */
+ * @brief Converts a given `nlopt_algorithm` to a string representation.
+ * 
+ * This function takes an optimization algorithm identifier of type `nlopt_algorithm` and returns its corresponding string representation. The mapping between the algorithm and its string name is defined in a static `std::map`. If the provided algorithm is found in the map, the corresponding string is returned. Otherwise, it returns "UNKNOWN".
+ * 
+ * @param algo The optimization algorithm to be converted to a string.
+ * @return A string representing the optimization algorithm.
+ */
   std::string numOptAlgorithm2String(nlopt_algorithm algo);
 
   /**
- * @brief Add pointcloud to a given buffer, ensures size compatibility of cloud to be added and buffer. Terminates if size is not compatible
+ * @brief Add pointcloud to a given buffer, ensures size compatibility of cloud to be added and buffer.
  * 
- * @param pc_buffer 
- * @param pc_cmp Cloud to be added to the buffer
+ * This function adds a point cloud (`pc_cmp`) to a given buffer (`pc_buffer`). If the buffer is empty, the cloud is simply pushed into the buffer. If the buffer is not empty, it checks the size of the last point cloud in the buffer and compares it with the size of the cloud to be added. If the sizes do not match, an error message is logged and the program is terminated. If the sizes match, the cloud is added to the buffer.
+ * 
+ * @param pc_buffer The buffer to which the point cloud is to be added. This is a vector of point clouds.
+ * @param pc_cmp The point cloud that is to be added to the buffer.
  */
   void addPointCloudToBuffer(
     std::vector<pcl::PointCloud<pcl::PointXYZI>> & pc_buffer,
     const pcl::PointCloud<pcl::PointXYZI> & pc_cmp);
 
   /**
-   * @brief 
-   * 
-   * @param msg 
-   */
+ * @brief Callback for processing incoming point clouds with averaging functionality.
+ * 
+ * This function processes incoming point clouds by first separating the points based on their angles into different regions: left mirror, right mirror, and front. These separated point clouds are then added to their respective buffers for further processing. If the buffer has fewer point clouds than the defined batch size (`averaging_n_clouds`), the point cloud is simply added to the buffer. Once the buffer reaches the batch size, the function averages the stored point clouds, splits them into different parts (e.g., mirror and front points), and clears the buffer for the next batch.
+ * 
+ * It also performs optimization if a certain number of batches have been processed.
+ * 
+ * @param msg The incoming point cloud message (type `sensor_msgs::msg::PointCloud2`) containing raw point cloud data.
+ */
   void pointcloudCallbackAveraging(const sensor_msgs::msg::PointCloud2::SharedPtr msg);
 
   /**
-   * @brief 
-   * 
-   * @param opt_hist 
-   * @param filename 
-   * @param optimization_method 
-   */
+ * @brief Exports the optimization history to a CSV file.
+ * 
+ * This function writes the provided optimization history data to a CSV file for later analysis. The file is stored in the `results` directory of the package. If the file already exists, the function appends the data to it. The file includes various optimization metrics such as pitch and yaw of the left and right mirrors, error values related to front, left mirror, right mirror, and reflection points.
+ * 
+ * The exported data helps in tracking the optimization process over time and can be used for further analysis or visualization.
+ * 
+ * @param opt_hist The optimization history object containing the data to be exported.
+ * @param filename The name of the file to export the data to.
+ * @param optimization_method The method used for optimization (used as a descriptor in the file).
+ */
   void exportOptimizationHistory(
     const optimization_history & opt_hist, const std::string & filename,
     const std::string & optimization_method);
@@ -522,12 +565,60 @@ private:
     bool mode = 0, bool mirror_left = 0);
 
   /**
-   * @brief 
+   * @brief Round a given double value to n decimals places
    * 
-   * @param value 
-   * @return double 
+   * @param[in] value unrounded double value
+   * @param[in] n number of decimal places
+   * @return double rounded value
    */
-  double roundTo4Decimals(double value);
+  double roundToNDecimals(double value, int n = 4);
+
+  /**
+ * @brief Identifies outliers in a point cloud based on the distance from a fitted line.
+ * 
+ * This function fits a line to the point cloud using principal component analysis (PCA). It computes the line's direction and identifies points that are outliers based on their perpendicular distance to the fitted line. Any point that exceeds the specified distance threshold from the line is considered an outlier.
+ * 
+ * The function returns the indices of the points that are identified as outliers. These outliers can be used for further processing, such as filtering out noise or analyzing unusual patterns in the data.
+ * 
+ * @param cloud The input point cloud to be analyzed.
+ * @param threshold The maximum distance from the line for a point to be considered an outlier. Points with a distance greater than this threshold will be classified as outliers.
+ * @return A vector of indices of the outlier points in the cloud.
+ */
+  std::vector<int> identifyOutliers(
+    const pcl::PointCloud<pcl::PointXYZI> & cloud, double threshold);
+
+  /**
+ * @brief Calculates the perpendicular distance from a point to a line in 3D space.
+ * 
+ * This function computes the perpendicular (shortest) distance from a point in 3D space to a line. The line is defined by a point on the line and a direction vector. The distance is calculated using the cross product of the vector from the point to the line and the line's direction vector. The norm of this cross product, divided by the norm of the line's direction vector, gives the distance.
+ * 
+ * @param point The point for which the distance to the line is being calculated.
+ * @param linePoint A point on the line.
+ * @param lineDirection The direction vector of the line.
+ * @return The perpendicular distance from the point to the line.
+ */
+  double pointToLineDistance(
+    const pcl::PointXYZI & point, const Eigen::Vector3d & linePoint,
+    const Eigen::Vector3d & lineDirection);
+
+  /**
+ * @brief Calculates the cross product of two 3D vectors.
+ * 
+ * This function computes the cross product of two 3D vectors. The cross product results in a new vector that is perpendicular to both input vectors. The function assumes that both input vectors have a size of 3. If the input vectors do not have a size of 3, an error message will be logged, and an empty vector will be returned.
+ * 
+ * @param a The first vector in the cross product calculation.
+ * @param b The second vector in the cross product calculation.
+ * @return A vector containing the cross product of the two input vectors.
+ *         If the input vectors are not 3D, an empty vector is returned.
+ */
+  std::vector<double> crossProduct(std::vector<double> & a, std::vector<double> & b);
+
+  int applyMirrorBoundary(
+    bool mirror_left, int idx_highest_intensity, size_t cloud_size);
+
+  
+    void applyInterpolation(
+      bool mirror_left, int idx_highest_intensity, pcl::PointCloud<pcl::PointXYZI> & cloud, double max_intensity);
 
   // Subscriber
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr input_cloud_sub_;
@@ -541,29 +632,30 @@ private:
   rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr optimized_plane_lm_pub_;
   rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr optimized_plane_rm_pub_;
   rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr optimized_plane_opt_plane_pub_;
-  rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr cube_marker_pub_;
+  rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr calib_plane_box_pub_;
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr optimized_planes_pub_;
 
   // parameters
-  int filter_method;
-  double filter_dist_threshold;
-  bool smoothingInputData;
+  int filter_method_;
+  double filter_dist_threshold_;
   std::string laser_scanner_topic_;
   std::string laser_scanner_frame_id_;
   double laser_scanner_angle_min_;
   double laser_scanner_angle_max_;
 
   // vizualization parameters
-  bool viz_transformed_cloud_all;
-  bool viz_transformed_cloud_rm;
-  bool viz_transformed_cloud_lm;
-  bool viz_transformed_cloud_front;
-  bool viz_normal_vectors;
-  bool viz_optimized_planes_all;
-  bool viz_optimized_plane_rm;
-  bool viz_optimized_plane_lm;
-  bool viz_optimized_plane_opt_plane;
+  bool viz_transformed_cloud_all_;
+  bool viz_transformed_cloud_rm_;
+  bool viz_transformed_cloud_lm_;
+  bool viz_transformed_cloud_front_;
+  bool viz_normal_vectors_;
+  bool viz_optimized_planes_all_;
+  bool viz_optimized_plane_rm_;
+  bool viz_optimized_plane_lm_;
+  bool viz_optimized_plane_opt_plane_;
   bool viz_optimization_plane_box_;
+  std::vector<double> viz_mirror_planes_dim_;
+  std::vector<double> viz_calib_plane_dim_;
 
   int optimization_buffer_size_;
   bool optimization_opt_mirror_support_vec_;
@@ -582,27 +674,27 @@ private:
   int optimization_verbose_;
   int optimization_evaluation_no_batches_;
 
-  int front_start_angle_;
-  int front_end_angle_;
+  double front_start_angle_;
+  double front_end_angle_;
 
-  int mirror_safety_bufferzone_size_lm;
+  int mirror_safety_bufferzone_size_lm_;
   bool auto_define_lm_start_angle_;
   bool auto_define_lm_end_angle_;
   int auto_define_lm_angle_mode_;
-  int mirror_left_start_angle_;
-  int mirror_left_end_angle_;
+  double mirror_left_start_angle_;
+  double mirror_left_end_angle_;
 
   std::vector<double> mirror_left_helper_p1_;
   std::vector<double> mirror_left_helper_p2_;
   std::vector<double> mirror_left_helper_p3_;
   std::vector<double> mirror_left_support_vec_;
 
-  int mirror_safety_bufferzone_size_rm;
+  int mirror_safety_bufferzone_size_rm_;
   bool auto_define_rm_start_angle_;
   bool auto_define_rm_end_angle_;
   int auto_define_rm_angle_mode_;
-  int mirror_right_start_angle_;
-  int mirror_right_end_angle_;
+  double mirror_right_start_angle_;
+  double mirror_right_end_angle_;
 
   std::vector<double> mirror_right_helper_p1_;
   std::vector<double> mirror_right_helper_p2_;
@@ -619,37 +711,39 @@ private:
   std::vector<double> plane_helper_p3_;
 
   // short-hand optimization flags
-  bool opt_mirror_orientation_all;
-  bool opt_mirror_orientation_mirror_svs;
-  bool opt_mirror_orientation_mirror_nvs;
-  bool opt_mirror_orientation_plane_sv;
-  bool apply_opt_osg_settings;
+  bool opt_mirror_orientation_all_;
+  bool opt_mirror_orientation_mirror_svs_;
+  bool opt_mirror_orientation_mirror_nvs_;
+  bool opt_mirror_orientation_plane_sv_;
+  bool apply_opt_osg_settings_;
 
   // mirror orientation optimization flags
-  bool opt_mirror_orientation_rm_sv_x;
-  bool opt_mirror_orientation_rm_sv_y;
-  bool opt_mirror_orientation_rm_sv_z;
+  bool opt_mirror_orientation_rm_sv_x_;
+  bool opt_mirror_orientation_rm_sv_y_;
+  bool opt_mirror_orientation_rm_sv_z_;
 
-  bool opt_mirror_orientation_rm_nv_x;
-  bool opt_mirror_orientation_rm_nv_y;
-  bool opt_mirror_orientation_rm_nv_z;
+  bool opt_mirror_orientation_rm_nv_x_;
+  bool opt_mirror_orientation_rm_nv_y_;
+  bool opt_mirror_orientation_rm_nv_z_;
+  bool rm_auto_calc_normal_vec_;
 
   bool opt_mirror_orientation_lm_sv_x;
   bool opt_mirror_orientation_lm_sv_y;
   bool opt_mirror_orientation_lm_sv_z;
 
-  bool opt_mirror_orientation_lm_nv_x;
-  bool opt_mirror_orientation_lm_nv_y;
-  bool opt_mirror_orientation_lm_nv_z;
+  bool opt_mirror_orientation_lm_nv_x_;
+  bool opt_mirror_orientation_lm_nv_y_;
+  bool opt_mirror_orientation_lm_nv_z_;
+  bool lm_auto_calc_normal_vec_;
 
   // calibration plane optimization flags
-  bool opt_mirror_orientation_plane_sv_x;
-  bool opt_mirror_orientation_plane_sv_y;
-  bool opt_mirror_orientation_plane_sv_z;
+  bool opt_mirror_orientation_plane_sv_x_;
+  bool opt_mirror_orientation_plane_sv_y_;
+  bool opt_mirror_orientation_plane_sv_z_;
 
-  bool opt_mirror_orientation_plane_nv_x;
-  bool opt_mirror_orientation_plane_nv_y;
-  bool opt_mirror_orientation_plane_nv_z;
+  bool opt_mirror_orientation_plane_nv_x_;
+  bool opt_mirror_orientation_plane_nv_y_;
+  bool opt_mirror_orientation_plane_nv_z_;
 
   // class members
   std::vector<pcl::PointCloud<pcl::PointXYZI>> pointcloud_buffer_;
@@ -677,12 +771,11 @@ private:
   optimization_result optimization_results_;
   std::vector<int> indices_high_intensity_lm_;
   std::vector<int> indices_high_intensity_rm_;
-  std::vector<sensor_msgs::msg::LaserScan> laser_scans;
+  std::vector<sensor_msgs::msg::LaserScan> laser_scans_;
 
   bool tmp_avg_flag = false;
 
-  std::string ros_ns;
-  nlopt_algorithm num_opt_algorithm;
+  nlopt_algorithm num_opt_algorithm_;
 };
 
 #endif  // LIDAR_MIRROR_FOV_RESHAPER_CALIB_HPP

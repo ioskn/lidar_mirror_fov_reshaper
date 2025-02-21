@@ -278,10 +278,9 @@ void lidarMirrorFOVReshaperTF::calcReflectionPoints(
     std::vector<double> distance_vec_raw{point.x, point.y, point.z};
     if (lidarMirrorFOVReshaperTF::getVectorMagnitude(distance_vec_raw) == 0.0)
     {
-      RCLCPP_INFO(
+      RCLCPP_WARN(
           rclcpp::get_logger("OSG_TF"),
-          "Point is at origin, no reflection point calculated! (Point: [%f,%f,%f])", point.x, point.y,
-          point.z);
+          "Raw-Input Point is equal to origin, no reflection point calculated!\nPotential fix: Re-define your mirror-FOV(s)");
       reflection_points->push_back(distance_vec_raw);
       continue;
     };
@@ -321,10 +320,20 @@ void lidarMirrorFOVReshaperTF::calcMirrorPlaneNormal(
   normal_vec[2] = (u_vec[0] * v_vec[1]) - (u_vec[1] * v_vec[0]);
 
   // normalization of normal_vec not needed as we only care about the direction of the normal vector
-
   RCLCPP_INFO(
       rclcpp::get_logger("OSG_TF"), "Calculated normal vector: (%f, %f, %f)", normal_vec[0],
       normal_vec[1], normal_vec[2]);
+
+  double normal_vec_mag = lidarMirrorFOVReshaperTF::getVectorMagnitude(normal_vec);
+  for (auto &coord : normal_vec)
+  {
+    coord /= normal_vec_mag;
+  };
+
+  RCLCPP_INFO(
+    rclcpp::get_logger("OSG_TF"), "Calculated normal vector: (%f, %f, %f)", normal_vec[0],
+    normal_vec[1], normal_vec[2]);
+  
 };
 
 void lidarMirrorFOVReshaperTF::calcPointPlaneDist(
@@ -443,7 +452,7 @@ void lidarMirrorFOVReshaperTF::transformCloud(
   intensities.insert(
       intensities.end(), intensities_left_mirror.begin(), intensities_left_mirror.end());
 
-  // formula 1) of paper
+  // eq. 1) (see README - Publications)
   std::vector<std::vector<double>> *reflection_points_left_mirror =
       new std::vector<std::vector<double>>;
   std::vector<std::vector<double>> *reflection_points_right_mirror =
@@ -457,7 +466,7 @@ void lidarMirrorFOVReshaperTF::transformCloud(
       src_cloud_right_mirror, mirror_right_normal_vec, mirror_right_support_vec,
       reflection_points_right_mirror);
 
-  // formula 2) of paper
+  // eq. 2) (see README - Publications)
   // calc unit vector r of reflection ray
   // each vector contains n 3-dim vectors (x, y, z)
   std::vector<std::vector<double>> *normalized_distance_vectors_left_mirror =
@@ -519,7 +528,7 @@ void lidarMirrorFOVReshaperTF::transformCloud(
   lidarMirrorFOVReshaperTF::getPointMagnitude(
       *reflection_points_right_mirror, mag_reflection_points_right_mirror);
 
-  // formula 3) of paper
+  // eq. 3) (see README - Publications)
   // calc vector v of reflection point to transformed data point
   std::vector<std::vector<double>> *reflection_point_to_tf_data_vectors_left_mirror =
       new std::vector<std::vector<double>>;
@@ -534,7 +543,7 @@ void lidarMirrorFOVReshaperTF::transformCloud(
       *unit_reflection_vectors_right_mirror, *mag_reflection_points_right_mirror,
       *mag_distance_vectors_right_mirror, reflection_point_to_tf_data_vectors_right_mirror);
 
-  // formula 4) of paper
+  // eq. 4) (see README - Publications)
   // calc vector d' (transformed vector d)
   // d' = reflection_point + reflection_vector
   std::vector<std::vector<double>> *transformed_distance_vectors_left_mirror =
@@ -598,13 +607,13 @@ void lidarMirrorFOVReshaperTF::transformCloud(
 };
 
 void lidarMirrorFOVReshaperTF::getPointcloudIndices(
-    const pcl::PointCloud<pcl::PointXYZI> &pcl_msg, int start_angle, int end_angle,
+    const pcl::PointCloud<pcl::PointXYZI> &pcl_msg, double start_angle, double end_angle,
     pcl::PointIndices *indices)
 {
   indices->header = pcl_msg.header;
 
   for (size_t i = 0; i < pcl_msg.points.size(); i++)
-  { // iter over all points
+  {
     double angle = lidarMirrorFOVReshaperTF::idxToAngle(i, pcl_msg.points.size());
     angle = lidarMirrorFOVReshaperTF::deg2rad(angle);
     if (angle >= start_angle && angle < end_angle)
@@ -614,11 +623,6 @@ void lidarMirrorFOVReshaperTF::getPointcloudIndices(
 
 double lidarMirrorFOVReshaperTF::idxToAngle(int idx, int size)
 {
-  //@todo wtf?!?!
-  if (idx <= size / 2)
-  {
-    return idx - size / 2;
-  }
   return idx - size / 2;
 };
 

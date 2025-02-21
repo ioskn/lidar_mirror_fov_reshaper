@@ -22,8 +22,8 @@ LidarMirrorFOVReshaperRuntime::LidarMirrorFOVReshaperRuntime()
 : Node("lidar_mirror_fov_reshaper_runtime")
 {
   // declare parameter
-  this->declare_parameter<std::string>("laser_scanner.laser_topic", "cloud");
-  this->declare_parameter<std::string>("laser_scanner.laser_frame", "cloud");
+  this->declare_parameter<std::string>("laser_scanner.topic", "cloud");
+  this->declare_parameter<std::string>("laser_scanner.frame", "cloud");
   this->declare_parameter<double>("laser_scanner.angle_min", -2.35619);
   this->declare_parameter<double>("laser_scanner.angle_max", 2.35619);
   this->declare_parameter<bool>("laser_scanner.use_poincloud_input", false);
@@ -39,43 +39,46 @@ LidarMirrorFOVReshaperRuntime::LidarMirrorFOVReshaperRuntime()
   this->declare_parameter<bool>("visualization.remove_unused_points", false);
 
   this->front_start_angle_ =
-    lidarMirrorFOVReshaperTF::deg2rad(this->declare_parameter<int>("front.start_angle", -45));
+    lidarMirrorFOVReshaperTF::deg2rad(this->declare_parameter<double>("front.start_angle", -45.0));
   this->front_end_angle_ =
-    lidarMirrorFOVReshaperTF::deg2rad(this->declare_parameter<int>("front.end_angle", -45));
+    lidarMirrorFOVReshaperTF::deg2rad(this->declare_parameter<double>("front.end_angle", -45.0));
 
   this->mirror_left_start_angle_ =
-    lidarMirrorFOVReshaperTF::deg2rad(this->declare_parameter<int>("mirror_left.start_angle", 95));
+    lidarMirrorFOVReshaperTF::deg2rad(this->declare_parameter<double>("mirror_left.start_angle", 95.0));
   this->mirror_left_end_angle_ =
-    lidarMirrorFOVReshaperTF::deg2rad(this->declare_parameter<int>("mirror_left.end_angle", 130));
+    lidarMirrorFOVReshaperTF::deg2rad(this->declare_parameter<double>("mirror_left.end_angle", 130.0));
   this->declare_parameter<std::vector<double>>("mirror_left.normal_vec", {0.0, 0.0, 0.0});
   this->declare_parameter<std::vector<double>>("mirror_left.support_vec", {0.0, 0.0, 0.0});
 
   this->mirror_right_start_angle_ = lidarMirrorFOVReshaperTF::deg2rad(
-    this->declare_parameter<int>("mirror_right.start_angle", -130));
+    this->declare_parameter<double>("mirror_right.start_angle", -130.0));
   this->mirror_right_end_angle_ =
-    lidarMirrorFOVReshaperTF::deg2rad(this->declare_parameter<int>("mirror_right.end_angle", -95));
+    lidarMirrorFOVReshaperTF::deg2rad(this->declare_parameter<double>("mirror_right.end_angle", -95.0));
   this->declare_parameter<std::vector<double>>("mirror_right.normal_vec", {0.0, 0.0, 0.0});
   this->declare_parameter<std::vector<double>>("mirror_right.support_vec", {0.0, 0.0, 0.0});
-
+  
   // get parameter
-  this->get_parameter("laser_scanner.laser_topic", this->laser_topic_);
-  this->get_parameter("laser_scanner.laser_frame", this->laser_frame_);
+  this->get_parameter("laser_scanner.topic", this->laser_topic_);
+  this->get_parameter("laser_scanner.frame", this->laser_frame_);
   this->get_parameter("laser_scanner.angle_min", this->laser_angle_min_);
   this->get_parameter("laser_scanner.angle_max", this->laser_angle_max_);
 
   this->get_parameter(
-    "visualization.pub_transformed_all_combined", this->viz_pub_transformed_all_combined);
-  this->get_parameter("visualization.pub_front", this->viz_pub_front);
+    "visualization.pub_transformed_all_combined", this->viz_pub_transformed_all_combined_);
+  this->get_parameter("visualization.pub_front", this->viz_pub_front_);
   this->get_parameter(
-    "visualization.pub_transformed_left_mirror", this->viz_pub_transformed_leftmirror);
+    "visualization.pub_transformed_left_mirror", this->viz_pub_transformed_leftmirror_);
   this->get_parameter(
-    "visualization.pub_transformed_right_mirror", this->viz_pub_transformed_rightmirror);
+    "visualization.pub_transformed_right_mirror", this->viz_pub_transformed_rightmirror_);
 
   this->get_parameter("mirror_left.normal_vec", mirror_left_normal_vec_);
   this->get_parameter("mirror_left.support_vec", mirror_left_support_vec_);
 
   this->get_parameter("mirror_right.normal_vec", mirror_right_normal_vec_);
   this->get_parameter("mirror_right.support_vec", mirror_right_support_vec_);
+  RCLCPP_INFO(
+    this->get_logger(), "normal_vec: %f, %f, %f", this->mirror_right_normal_vec_[0],
+    this->mirror_right_normal_vec_[1], this->mirror_right_normal_vec_[2]);
 
   // Subscriber
   if (this->get_parameter("laser_scanner.use_poincloud_input").as_bool()) {
@@ -112,18 +115,22 @@ void LidarMirrorFOVReshaperRuntime::splitPointcloud(
   const pcl::PointCloud<pcl::PointXYZI> & src_cloud,
   pcl::PointCloud<pcl::PointXYZI> * left_mirror_cloud,
   pcl::PointCloud<pcl::PointXYZI> * right_mirror_cloud,
-  pcl::PointCloud<pcl::PointXYZI> * front_cloud, pcl::PointIndices * indices_left_mirror,
+  pcl::PointCloud<pcl::PointXYZI> * front_cloud, 
+  pcl::PointIndices * indices_left_mirror,
   pcl::PointIndices * indices_right_mirror, pcl::PointIndices * indices_front,
   pcl::PointIndices * indices_zero_to_startrm, pcl::PointIndices * indices_endrm_to_startfront,
   pcl::PointIndices * indices_endfront_to_startlm, pcl::PointIndices * indices_endlm_to_end)
 {
+  indices_left_mirror->indices.clear();
   lidarMirrorFOVReshaperTF::getPointcloudIndices(
     src_cloud, this->mirror_left_start_angle_, this->mirror_left_end_angle_, indices_left_mirror);
 
+  indices_right_mirror->indices.clear();
   lidarMirrorFOVReshaperTF::getPointcloudIndices(
     src_cloud, this->mirror_right_start_angle_, this->mirror_right_end_angle_,
     indices_right_mirror);
 
+  indices_front->indices.clear();
   lidarMirrorFOVReshaperTF::getPointcloudIndices(
     src_cloud, this->front_start_angle_, this->front_end_angle_, indices_front);
 
@@ -132,16 +139,20 @@ void LidarMirrorFOVReshaperRuntime::splitPointcloud(
   pcl::copyPointCloud(src_cloud, indices_front->indices, *front_cloud);
 
   // get indices for the transition between the clouds
+  indices_zero_to_startrm->indices.clear();
   lidarMirrorFOVReshaperTF::getPointcloudIndices(
     src_cloud, this->laser_angle_min_, this->mirror_right_start_angle_, indices_zero_to_startrm);
-
+  
+  indices_endrm_to_startfront->indices.clear();
   lidarMirrorFOVReshaperTF::getPointcloudIndices(
     src_cloud, this->mirror_right_end_angle_, this->front_start_angle_,
     indices_endrm_to_startfront);
 
+  indices_endfront_to_startlm->indices.clear();
   lidarMirrorFOVReshaperTF::getPointcloudIndices(
     src_cloud, this->front_end_angle_, this->mirror_left_start_angle_, indices_endfront_to_startlm);
-
+  
+  indices_endlm_to_end->indices.clear();
   lidarMirrorFOVReshaperTF::getPointcloudIndices(
     src_cloud, this->mirror_left_end_angle_, this->laser_angle_max_, indices_endlm_to_end);
 };
@@ -176,7 +187,12 @@ void LidarMirrorFOVReshaperRuntime::pointcloudCallback(
   pcl::PointIndices * indices_endfront_to_startlm = new pcl::PointIndices();
   pcl::PointIndices * indices_endlm_to_end = new pcl::PointIndices();
 
-  // ensure sum of all indices is equal to the size of the input pointcloud, those indices missed add to nan to be set indices
+  this->splitPointcloud(
+    pcl_pointcloud_raw, pcl_left_mirror_cloud, pcl_right_mirror_cloud, pcl_front_cloud,
+    indices_left_mirror, indices_right_mirror, indices_front, indices_zero_to_startrm,
+    indices_endrm_to_startfront, indices_endfront_to_startlm, indices_endlm_to_end);
+  
+      // ensure sum of all indices is equal to the size of the input pointcloud, those indices missed add to nan to be set indices
   int tgt_size = pcl_pointcloud_raw.size();
   int sum_indices = 0;
   sum_indices += indices_left_mirror->indices.size();
@@ -213,11 +229,6 @@ void LidarMirrorFOVReshaperRuntime::pointcloudCallback(
     };
   }
 
-  this->splitPointcloud(
-    pcl_pointcloud_raw, pcl_left_mirror_cloud, pcl_right_mirror_cloud, pcl_front_cloud,
-    indices_left_mirror, indices_right_mirror, indices_front, indices_zero_to_startrm,
-    indices_endrm_to_startfront, indices_endfront_to_startlm, indices_endlm_to_end);
-
   pcl::copyPointCloud(pcl_pointcloud_raw, *indices_endrm_to_startfront, *pcl_endrm_to_startfront);
   pcl::copyPointCloud(pcl_pointcloud_raw, *indices_endfront_to_startlm, *pcl_endfront_to_startlm);
   pcl::copyPointCloud(pcl_pointcloud_raw, *indices_endlm_to_end, *pcl_endlm_to_end);
@@ -253,19 +264,18 @@ void LidarMirrorFOVReshaperRuntime::pointcloudCallback(
     this->setNaNAtIndices(all_cloud, indices_missing);
   }
 
-  // Publish transformed clouds
-  if (this->viz_pub_transformed_all_combined)
+  if (this->viz_pub_transformed_all_combined_)
     publishPointCloud(*all_cloud, this->pointcloud_transformed_all_pub_, msg->header);
 
-  if (this->viz_pub_front) {
+  if (this->viz_pub_front_) {
     publishPointCloud(*pcl_front_cloud, this->pointcloud_front_pub_, msg->header);
   }
 
-  if (this->viz_pub_transformed_leftmirror)
+  if (this->viz_pub_transformed_leftmirror_)
     publishPointCloud(
       *pcl_left_mirror_transformed, this->pointcloud_left_transformed_pub_, msg->header);
 
-  if (this->viz_pub_transformed_rightmirror)
+  if (this->viz_pub_transformed_rightmirror_)
     publishPointCloud(
       *pcl_right_mirror_transformed, this->pointcloud_right_transformed_pub_, msg->header);
 
@@ -325,8 +335,6 @@ void LidarMirrorFOVReshaperRuntime::publishPointCloud(
   sensor_msgs::msg::PointCloud2 cloud_msg;
   pcl::toROSMsg(cloud, cloud_msg);
   cloud_msg.header = header;
-  cloud_msg.width = cloud.size();
-  cloud_msg.height = 1;
   cloud_msg.is_dense = true;
 
   publisher->publish(cloud_msg);

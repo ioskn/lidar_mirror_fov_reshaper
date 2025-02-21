@@ -1,34 +1,40 @@
-import os
+"""
+  Copyright 2025 Andreas Loeffler
 
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+"""
+
+import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch_ros.actions import Node
 
+PKG_NAME = 'lidar_mirror_fov_reshaper_runtime'
+NAMESPACE = ''
 
 def generate_launch_description():
     config = os.path.join(get_package_share_directory(
-        'lidar_mirror_fov_reshaper_runtime'), 'config', 'params.yaml')    
-    
-    osg_runtime = Node(
-        package='lidar_mirror_fov_reshaper_runtime',
-        executable='lidar_mirror_fov_reshaper_runtime',
-        name='lidar_mirror_fov_reshaper_runtime',
+        PKG_NAME), 'config', 'params.yaml')
+
+    osg_runtime_node = Node(
+        package=PKG_NAME,
+        executable=PKG_NAME,
+        name=PKG_NAME,
+        namespace=NAMESPACE,
         parameters=[config],
         output='screen')
-    
-    # fake localization; Used for demo purposes only
-    static_map_odom = Node(
-                package="tf2_ros",
-                executable="static_transform_publisher",
-                arguments=["0.0", "0.0", "0", "0", "0", "0", "map", "odom"])
-    static_odom_base_link = Node(
-                package="tf2_ros",
-                executable="static_transform_publisher",
-                arguments=["0.0", "0.0", "0", "0", "0", "0", "odom", "base_link"])
-    
+
     ld = LaunchDescription()
-    ld.add_action(osg_runtime)
-    # ld.add_action(static_map_odom)
-    # ld.add_action(static_odom_base_link)
-    
+    ld.add_action(osg_runtime_node)
+
     return ld

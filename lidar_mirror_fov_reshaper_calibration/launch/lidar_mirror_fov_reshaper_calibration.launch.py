@@ -15,23 +15,22 @@
 """
 
 import os
-
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch_ros.actions import Node
 
+PKG_NAME = 'lidar_mirror_fov_reshaper_calibration'
+NAMESPACE = ''
 
 def generate_launch_description():
-
-    ns = 'lidar_mirror_reshaper'
     config = os.path.join(get_package_share_directory(
-        'lidar_mirror_fov_reshaper_calibration'), 'config', 'params.yaml')
+        PKG_NAME), 'config', 'params.yaml')
 
     return LaunchDescription([Node(
-        package=ns+'_calibration',
-        executable=ns+'_calibration',
-        name=ns+'_calibration',
-        namespace=ns,
+        package=PKG_NAME,
+        executable=PKG_NAME,
+        name=PKG_NAME,
+        namespace=NAMESPACE,
         parameters=[config],
         output='screen')
     ])

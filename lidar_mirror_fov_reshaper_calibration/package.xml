@@ -17,7 +17,6 @@
     <depend>visualization_msgs</depend>
     <depend>tf2</depend>
     <depend>tf2_ros</depend>
-
     <depend>libnlopt-dev</depend>
 
     <exec_depend>rviz_common</exec_depend>

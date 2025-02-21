@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-#ifndef LIDARMIRRORFOVRESHAPERRUNTIME_HPP
-#define LIDARMIRRORFOVRESHAPERRUNTIME_HPP
+#ifndef LIDAR_MIRROR_FOV_RESHAPER_RUNTIME_HPP
+#define LIDAR_MIRROR_FOV_RESHAPER_RUNTIME_HPP
 
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
@@ -111,7 +111,6 @@ private:
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pointcloud_transformed_all_pub_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pointcloud_left_transformed_pub_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pointcloud_right_transformed_pub_;
-  rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pointcloud_transformed_all_pub_2d;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pointcloud_front_pub_;
 
   // Tf utils
@@ -125,10 +124,10 @@ private:
   double laser_angle_min_;
   double laser_angle_max_;
 
-  bool viz_pub_transformed_all_combined;
-  bool viz_pub_front;
-  bool viz_pub_transformed_leftmirror;
-  bool viz_pub_transformed_rightmirror;
+  bool viz_pub_transformed_all_combined_;
+  bool viz_pub_front_;
+  bool viz_pub_transformed_leftmirror_;
+  bool viz_pub_transformed_rightmirror_;
 
   double front_start_angle_;
   double front_end_angle_;
@@ -145,4 +144,4 @@ private:
   std::vector<double> mirror_right_normal_vec_;
   std::vector<double> mirror_right_support_vec_;
 };
-#endif  // LIDARMIRRORFOVRESHAPERRUNTIME_HPP
+#endif  // LIDAR_MIRROR_FOV_RESHAPER_RUNTIME_HPP
