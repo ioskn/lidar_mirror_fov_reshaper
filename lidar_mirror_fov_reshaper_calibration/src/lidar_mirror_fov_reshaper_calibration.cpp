@@ -21,35 +21,38 @@ LidarMirrorFOVReshaperCalib::LidarMirrorFOVReshaperCalib()
 {
   this->laser_scanner_topic_ = this->declare_parameter<std::string>("laser_scanner.topic", "cloud");
   this->laser_scanner_frame_id_ =
-    this->declare_parameter<std::string>("laser_scanner.laser_frame", "cloud");
+    this->declare_parameter<std::string>("laser_scanner.frame", "cloud");
   this->laser_scanner_angle_min_ =
-    this->deg2rad(this->declare_parameter<int>("laser_scanner.angle_min", -135));
+    this->declare_parameter<double>("laser_scanner.angle_min", -2.35619);  // -135 deg
   this->laser_scanner_angle_max_ =
-    this->deg2rad(this->declare_parameter<int>("laser_scanner.angle_max", 135));
+    this->declare_parameter<double>("laser_scanner.angle_max", 2.35619);  // 135 deg
   this->declare_parameter<bool>("laser_scanner.use_pointcloud_input", false);
 
-  this->viz_transformed_cloud_all =
-    this->declare_parameter<bool>("visualization.pub_transformed_all_combined", false);
-  this->viz_transformed_cloud_rm =
-    this->declare_parameter<bool>("visualization.pub_transformed_right_mirror", false);
-  this->viz_transformed_cloud_lm =
-    this->declare_parameter<bool>("visualization.pub_transformed_left_mirror", false);
-  this->viz_transformed_cloud_front =
-    this->declare_parameter<bool>("visualization.pub_front", false);
-  this->viz_normal_vectors = this->declare_parameter<bool>("visualization.normal_vectors", false);
-  this->viz_optimized_planes_all =
+  this->viz_transformed_cloud_all_ =
+    this->declare_parameter<bool>("visualization.transformed_cloud_all", false);
+  this->viz_transformed_cloud_rm_ =
+    this->declare_parameter<bool>("visualization.transformed_cloud_rm", false);
+  this->viz_transformed_cloud_lm_ =
+    this->declare_parameter<bool>("visualization.transformed_cloud_lm", false);
+  this->viz_transformed_cloud_front_ = this->declare_parameter<bool>("visualization.front", false);
+  this->viz_normal_vectors_ = this->declare_parameter<bool>("visualization.normal_vectors", false);
+  this->viz_optimized_planes_all_ =
     this->declare_parameter<bool>("visualization.optimized_planes_all", false);
-  this->viz_optimized_plane_rm =
+  this->viz_optimized_plane_rm_ =
     this->declare_parameter<bool>("visualization.optimized_plane_rm", false);
-  this->viz_optimized_plane_lm =
+  this->viz_optimized_plane_lm_ =
     this->declare_parameter<bool>("visualization.optimized_plane_lm", false);
-  this->viz_optimized_plane_opt_plane =
+  this->viz_optimized_plane_opt_plane_ =
     this->declare_parameter<bool>("visualization.optimized_plane_opt_plane", false);
   this->viz_optimization_plane_box_ =
     this->declare_parameter<bool>("visualization.optimization_plane_box", false);
+  this->viz_mirror_planes_dim_ = this->declare_parameter<std::vector<double>>(
+    "visualization.mirror_planes_dim", {0.005, 0.06, 0.04});
+  this->viz_calib_plane_dim_ = this->declare_parameter<std::vector<double>>(
+    "visualization.calib_plane_dim", {0.05, 0.75, 4.0});
 
-  this->filter_method = this->declare_parameter<int>("optimization.filter_method", 0);
-  this->filter_dist_threshold =
+  this->filter_method_ = this->declare_parameter<int>("optimization.filter_method_", 0);
+  this->filter_dist_threshold_ =
     this->declare_parameter<double>("optimization.distance_threshold", 0.05);
   this->interpolation_window =
     this->declare_parameter<int>("optimization.interpolation_window", -1);
@@ -60,8 +63,6 @@ LidarMirrorFOVReshaperCalib::LidarMirrorFOVReshaperCalib()
   this->optimization_epsabs_ = this->declare_parameter<double>("optimization.epsabs", 1e-6);
   this->optimization_stepsize_ = this->declare_parameter<double>("optimization.stepsize", 1e-3);
   this->optimization_iter_max_ = this->declare_parameter<int>("optimization.iter_max", 100);
-  this->optimization_adaptive_stepsize_ =
-    this->declare_parameter<bool>("optimization.adaptive_stepsize", false);
   this->optimization_opt_mirror_orientation_ =
     this->declare_parameter<bool>("optimization.opt_mirror_orientation", true);
   this->optimization_opt_mirror_support_vec_ =
@@ -74,36 +75,35 @@ LidarMirrorFOVReshaperCalib::LidarMirrorFOVReshaperCalib()
     "optimization.optimization_history_file", "optimization_history.csv");
   this->optimized_params_meta_file_ = this->declare_parameter<std::string>(
     "optimization.optimized_params_meta_file", "open_see_ground_calib_methods.csv");
-  this->optimized_params_file_ = this->declare_parameter<std::string>(
-    "optimization.optimized_params_file", "open_see_ground_calib_results.csv");
-  this->declare_parameter<std::string>("optimization.optimized_params_out_dir", "");
+  this->optimized_params_file_ =
+    this->declare_parameter<std::string>("optimization.optimized_params_file", "lmfrc_results.csv");
 
   this->optimization_verbose_ = this->declare_parameter<int>("optimization.verbose", 0);
   this->optimization_evaluation_no_batches_ =
     this->declare_parameter<int>("optimization.evaluation_no_batches", 2);
 
-  this->opt_mirror_orientation_all =
+  this->opt_mirror_orientation_all_ =
     this->declare_parameter<bool>("optimization.optimization_mirror_orientation.opt_all", false);
-  this->opt_mirror_orientation_mirror_svs = this->declare_parameter<bool>(
+  this->opt_mirror_orientation_mirror_svs_ = this->declare_parameter<bool>(
     "optimization.optimization_mirror_orientation.opt_mirror_svs", false);
-  this->opt_mirror_orientation_mirror_nvs = this->declare_parameter<bool>(
+  this->opt_mirror_orientation_mirror_nvs_ = this->declare_parameter<bool>(
     "optimization.optimization_mirror_orientation.opt_mirror_nvs", true);
-  this->opt_mirror_orientation_plane_sv = this->declare_parameter<bool>(
+  this->opt_mirror_orientation_plane_sv_ = this->declare_parameter<bool>(
     "optimization.optimization_mirror_orientation.opt_plane_sv", true);
-  this->apply_opt_osg_settings = this->declare_parameter<bool>(
+  this->apply_opt_osg_settings_ = this->declare_parameter<bool>(
     "optimization.optimization_mirror_orientation.opt_osg_settings", false);
 
-  this->opt_mirror_orientation_rm_sv_x = this->declare_parameter<bool>(
+  this->opt_mirror_orientation_rm_sv_x_ = this->declare_parameter<bool>(
     "optimization.optimization_mirror_orientation.right_mirror.support_vec.x", true);
-  this->opt_mirror_orientation_rm_sv_y = this->declare_parameter<bool>(
+  this->opt_mirror_orientation_rm_sv_y_ = this->declare_parameter<bool>(
     "optimization.optimization_mirror_orientation.right_mirror.support_vec.y", true);
-  this->opt_mirror_orientation_rm_sv_z = this->declare_parameter<bool>(
+  this->opt_mirror_orientation_rm_sv_z_ = this->declare_parameter<bool>(
     "optimization.optimization_mirror_orientation.right_mirror.support_vec.z", true);
-  this->opt_mirror_orientation_rm_nv_x = this->declare_parameter<bool>(
+  this->opt_mirror_orientation_rm_nv_x_ = this->declare_parameter<bool>(
     "optimization.optimization_mirror_orientation.right_mirror.normal_vec.x", true);
-  this->opt_mirror_orientation_rm_nv_y = this->declare_parameter<bool>(
+  this->opt_mirror_orientation_rm_nv_y_ = this->declare_parameter<bool>(
     "optimization.optimization_mirror_orientation.right_mirror.normal_vec.y", true);
-  this->opt_mirror_orientation_rm_nv_z = this->declare_parameter<bool>(
+  this->opt_mirror_orientation_rm_nv_z_ = this->declare_parameter<bool>(
     "optimization.optimization_mirror_orientation.right_mirror.normal_vec.z", true);
 
   this->opt_mirror_orientation_lm_sv_x = this->declare_parameter<bool>(
@@ -112,25 +112,25 @@ LidarMirrorFOVReshaperCalib::LidarMirrorFOVReshaperCalib()
     "optimization.optimization_mirror_orientation.left_mirror.support_vec.y", true);
   this->opt_mirror_orientation_lm_sv_z = this->declare_parameter<bool>(
     "optimization.optimization_mirror_orientation.left_mirror.support_vec.z", true);
-  this->opt_mirror_orientation_lm_nv_x = this->declare_parameter<bool>(
+  this->opt_mirror_orientation_lm_nv_x_ = this->declare_parameter<bool>(
     "optimization.optimization_mirror_orientation.left_mirror.normal_vec.x", true);
-  this->opt_mirror_orientation_lm_nv_y = this->declare_parameter<bool>(
+  this->opt_mirror_orientation_lm_nv_y_ = this->declare_parameter<bool>(
     "optimization.optimization_mirror_orientation.left_mirror.normal_vec.y", true);
-  this->opt_mirror_orientation_lm_nv_z = this->declare_parameter<bool>(
+  this->opt_mirror_orientation_lm_nv_z_ = this->declare_parameter<bool>(
     "optimization.optimization_mirror_orientation.left_mirror.normal_vec.z", true);
 
-  this->opt_mirror_orientation_plane_sv_x = this->declare_parameter<bool>(
+  this->opt_mirror_orientation_plane_sv_x_ = this->declare_parameter<bool>(
     "optimization.optimization_mirror_orientation.calibration_plane.support_vec.x", true);
-  this->opt_mirror_orientation_plane_sv_y = this->declare_parameter<bool>(
+  this->opt_mirror_orientation_plane_sv_y_ = this->declare_parameter<bool>(
     "optimization.optimization_mirror_orientation.calibration_plane.support_vec.y", true);
-  this->opt_mirror_orientation_plane_sv_z = this->declare_parameter<bool>(
+  this->opt_mirror_orientation_plane_sv_z_ = this->declare_parameter<bool>(
     "optimization.optimization_mirror_orientation.calibration_plane.support_vec.z", true);
 
-  this->opt_mirror_orientation_plane_nv_x = this->declare_parameter<bool>(
+  this->opt_mirror_orientation_plane_nv_x_ = this->declare_parameter<bool>(
     "optimization.optimization_mirror_orientation.calibration_plane.normal_vec.x", true);
-  this->opt_mirror_orientation_plane_nv_y = this->declare_parameter<bool>(
+  this->opt_mirror_orientation_plane_nv_y_ = this->declare_parameter<bool>(
     "optimization.optimization_mirror_orientation.calibration_plane.normal_vec.y", true);
-  this->opt_mirror_orientation_plane_nv_z = this->declare_parameter<bool>(
+  this->opt_mirror_orientation_plane_nv_z_ = this->declare_parameter<bool>(
     "optimization.optimization_mirror_orientation.calibration_plane.normal_vec.z", true);
 
   this->plane_support_vec_ =
@@ -142,23 +142,19 @@ LidarMirrorFOVReshaperCalib::LidarMirrorFOVReshaperCalib()
   this->plane_helper_p3_ =
     this->declare_parameter<std::vector<double>>("calibration_plane.helper_p3", {0.0, 0.0, 0.0});
 
-  this->front_start_angle_ =
-    this->deg2rad(this->declare_parameter<double>("mirror_front.start_angle", 0.0));
-  this->front_end_angle_ =
-    this->deg2rad(this->declare_parameter<double>("mirror_front.end_angle", 0.0));
+  this->front_start_angle_ = lidarMirrorFOVReshaperTF::deg2rad(
+    this->declare_parameter<double>("mirror_front.start_angle", -90.0));
+  this->front_end_angle_ = lidarMirrorFOVReshaperTF::deg2rad(
+    this->declare_parameter<double>("mirror_front.end_angle", 90.0));
 
-  this->mirror_safety_bufferzone_size_lm =
+  this->mirror_safety_bufferzone_size_lm_ =
     this->declare_parameter<int>("mirror_left.mirror_safety_bufferzone_size", 2);
-  this->auto_define_lm_start_angle_ =
-    this->declare_parameter<bool>("mirror_left.auto_define_start_angle", false);
-  this->auto_define_lm_end_angle_ =
-    this->declare_parameter<bool>("mirror_left.auto_define_end_angle", false);
   this->auto_define_lm_angle_mode_ =
     this->declare_parameter<int>("mirror_left.auto_define_angle_mode", 0);
-  this->mirror_left_start_angle_ =
-    this->deg2rad(this->declare_parameter<int>("mirror_left.start_angle", 90));
-  this->mirror_left_end_angle_ =
-    this->deg2rad(this->declare_parameter<int>("mirror_left.end_angle", 135));
+  this->mirror_left_start_angle_ = lidarMirrorFOVReshaperTF::deg2rad(
+    this->declare_parameter<double>("mirror_left.start_angle", 90.0));
+  this->mirror_left_end_angle_ = lidarMirrorFOVReshaperTF::deg2rad(
+    this->declare_parameter<double>("mirror_left.end_angle", 135.0));
   this->mirror_left_helper_p1_ =
     this->declare_parameter<std::vector<double>>("mirror_left.helper_p1", {0.0, 0.0, -1.0});
   this->mirror_left_helper_p2_ =
@@ -169,19 +165,17 @@ LidarMirrorFOVReshaperCalib::LidarMirrorFOVReshaperCalib()
     this->declare_parameter<std::vector<double>>("mirror_left.support_vec", {0.0, 0.0, 0.0});
   this->mirror_left_normal_vec_ =
     this->declare_parameter<std::vector<double>>("mirror_left.normal_vec", {0.6, -0.6, -0.4});
+  this->lm_auto_calc_normal_vec_ =
+    this->declare_parameter<bool>("mirror_left.auto_calc_normal_vec", false);
 
-  this->mirror_safety_bufferzone_size_rm =
+  this->mirror_safety_bufferzone_size_rm_ =
     this->declare_parameter<int>("mirror_right.mirror_safety_bufferzone_size", 2);
-  this->auto_define_rm_start_angle_ =
-    this->declare_parameter<bool>("mirror_right.auto_define_start_angle", false);
-  this->auto_define_rm_end_angle_ =
-    this->declare_parameter<bool>("mirror_right.auto_define_end_angle", false);
   this->auto_define_rm_angle_mode_ =
     this->declare_parameter<int>("mirror_right.auto_define_angle_mode", 0);
-  this->mirror_right_start_angle_ =
-    this->deg2rad(this->declare_parameter<int>("mirror_right.start_angle", -135));
-  this->mirror_right_end_angle_ =
-    this->deg2rad(this->declare_parameter<int>("mirror_right.end_angle", 135));
+  this->mirror_right_start_angle_ = lidarMirrorFOVReshaperTF::deg2rad(
+    this->declare_parameter<double>("mirror_right.start_angle", -135.0));
+  this->mirror_right_end_angle_ = lidarMirrorFOVReshaperTF::deg2rad(
+    this->declare_parameter<double>("mirror_right.end_angle", -90.0));
   this->mirror_right_helper_p1_ =
     this->declare_parameter<std::vector<double>>("mirror_right.helper_p1", {0.0, 0.0, -1.0});
   this->mirror_right_helper_p2_ =
@@ -192,6 +186,8 @@ LidarMirrorFOVReshaperCalib::LidarMirrorFOVReshaperCalib()
     this->declare_parameter<std::vector<double>>("mirror_right.support_vec", {0.0, 0.0, 0.0});
   this->mirror_right_normal_vec_ =
     this->declare_parameter<std::vector<double>>("mirror_right.normal_vec", {0.6, 0.6, -0.4});
+  this->rm_auto_calc_normal_vec_ =
+    this->declare_parameter<bool>("mirror_right.auto_calc_normal_vec", false);
 
   // subscriber
   if (!this->get_parameter("laser_scanner.use_pointcloud_input").as_bool()) {
@@ -204,7 +200,7 @@ LidarMirrorFOVReshaperCalib::LidarMirrorFOVReshaperCalib()
       std::bind(&LidarMirrorFOVReshaperCalib::pointcloudCallback, this, std::placeholders::_1));
   }
 
-  // viz
+  // visualization
   this->transformed_cloud_all_pub_ =
     this->create_publisher<sensor_msgs::msg::PointCloud2>("transformed_cloud_all", 10);
   this->transformed_cloud_lm_pub_ =
@@ -224,27 +220,27 @@ LidarMirrorFOVReshaperCalib::LidarMirrorFOVReshaperCalib()
   this->optimized_plane_opt_plane_pub_ =
     this->create_publisher<visualization_msgs::msg::Marker>("optimized_plane_opt_plane", 10);
 
-  this->cube_marker_pub_ =
-    this->create_publisher<visualization_msgs::msg::Marker>("cube_marker", 10);
+  this->calib_plane_box_pub_ =
+    this->create_publisher<visualization_msgs::msg::Marker>("calib_plane_box", 10);
 
-  // optimization
+  // calibration plane
   lidarMirrorFOVReshaperTF::calcMirrorPlaneNormal(
     this->plane_helper_p1_, this->plane_helper_p2_, this->plane_helper_p3_,
     this->plane_normal_vec_);
 
-  this->ros_ns = std::string("lidar_mirror_fov_reshaper_calibration");
+  this->num_opt_algorithm_ = NLOPT_LN_NELDERMEAD;
 
-  this->num_opt_algorithm = NLOPT_LN_NELDERMEAD;
+  if (this->lm_auto_calc_normal_vec_)
+    lidarMirrorFOVReshaperTF::calcMirrorPlaneNormal(
+      this->mirror_left_helper_p1_, this->mirror_left_helper_p2_, this->mirror_left_helper_p3_,
+      this->mirror_left_normal_vec_);
 
-  lidarMirrorFOVReshaperTF::calcMirrorPlaneNormal(
-    this->mirror_left_helper_p1_, this->mirror_left_helper_p2_, this->mirror_left_helper_p3_,
-    this->mirror_left_normal_vec_);
+  if (this->rm_auto_calc_normal_vec_)
+    lidarMirrorFOVReshaperTF::calcMirrorPlaneNormal(
+      this->mirror_right_helper_p1_, this->mirror_right_helper_p2_, this->mirror_right_helper_p3_,
+      this->mirror_right_normal_vec_);
 
-  lidarMirrorFOVReshaperTF::calcMirrorPlaneNormal(
-    this->mirror_right_helper_p1_, this->mirror_right_helper_p2_, this->mirror_right_helper_p3_,
-    this->mirror_right_normal_vec_);
-
-  if (this->apply_opt_osg_settings) this->initOpenSeeGroundCalibOrientationParams();
+  if (this->apply_opt_osg_settings_) this->initOpenSeeGroundCalibOrientationParams();
 
   if (this->intensity_threshold_percentage_ > 1.0 || this->intensity_threshold_percentage_ < 0.0) {
     RCLCPP_ERROR(
@@ -272,29 +268,29 @@ LidarMirrorFOVReshaperCalib::~LidarMirrorFOVReshaperCalib(){};
 
 void LidarMirrorFOVReshaperCalib::initOpenSeeGroundCalibOrientationParams()
 {
-  this->opt_mirror_orientation_rm_sv_x = false;
-  this->opt_mirror_orientation_rm_sv_y = false;
-  this->opt_mirror_orientation_rm_sv_z = false;
+  this->opt_mirror_orientation_rm_sv_x_ = false;
+  this->opt_mirror_orientation_rm_sv_y_ = false;
+  this->opt_mirror_orientation_rm_sv_z_ = false;
 
-  this->opt_mirror_orientation_rm_nv_x = true;
-  this->opt_mirror_orientation_rm_nv_y = false;
-  this->opt_mirror_orientation_rm_nv_z = true;
+  this->opt_mirror_orientation_rm_nv_x_ = true;
+  this->opt_mirror_orientation_rm_nv_y_ = false;
+  this->opt_mirror_orientation_rm_nv_z_ = true;
 
   this->opt_mirror_orientation_lm_sv_x = false;
   this->opt_mirror_orientation_lm_sv_y = false;
   this->opt_mirror_orientation_lm_sv_z = false;
 
-  this->opt_mirror_orientation_lm_nv_x = true;
-  this->opt_mirror_orientation_lm_nv_y = false;
-  this->opt_mirror_orientation_lm_nv_z = true;
+  this->opt_mirror_orientation_lm_nv_x_ = true;
+  this->opt_mirror_orientation_lm_nv_y_ = false;
+  this->opt_mirror_orientation_lm_nv_z_ = true;
 
-  this->opt_mirror_orientation_plane_sv_x = true;
-  this->opt_mirror_orientation_plane_sv_y = true;
-  this->opt_mirror_orientation_plane_sv_z = true;
+  this->opt_mirror_orientation_plane_sv_x_ = true;
+  this->opt_mirror_orientation_plane_sv_y_ = true;
+  this->opt_mirror_orientation_plane_sv_z_ = true;
 
-  this->opt_mirror_orientation_plane_nv_x = false;
-  this->opt_mirror_orientation_plane_nv_y = true;
-  this->opt_mirror_orientation_plane_nv_z = true;
+  this->opt_mirror_orientation_plane_nv_x_ = false;
+  this->opt_mirror_orientation_plane_nv_y_ = true;
+  this->opt_mirror_orientation_plane_nv_z_ = true;
 };
 
 void LidarMirrorFOVReshaperCalib::pointcloudCallbackAveraging(
@@ -330,11 +326,8 @@ void LidarMirrorFOVReshaperCalib::pointcloudCallbackAveraging(
   delete indices_left_mirror;
   delete indices_right_mirror;
   delete indices_front;
-  // ----------------------
 
-  // check size of raw buffers, if == batch_size, do same as normal and clear buffer
-  // if < batch_size, add to buffer and return
-  if (this->raw_pointcloud_buffer_.size() < this->averaging_n_clouds) {
+  if (this->raw_pointcloud_buffer_.size() < static_cast<size_t>(this->averaging_n_clouds)) {
     pcl::PointCloud<pcl::PointXYZI> pcl_msg;
     pcl::fromROSMsg(*msg, pcl_msg);
     this->raw_pointcloud_buffer_.push_back(pcl_msg);
@@ -344,11 +337,10 @@ void LidarMirrorFOVReshaperCalib::pointcloudCallbackAveraging(
     RCLCPP_INFO(this->get_logger(), "# of Batches: %ld", this->pointcloud_buffer_front_.size());
   }
 
-  if (this->raw_pointcloud_buffer_.size() >= this->averaging_n_clouds) {
+  if (this->raw_pointcloud_buffer_.size() >= static_cast<size_t>(this->averaging_n_clouds)) {
     pcl::PointCloud<pcl::PointXYZI> pcl_msg;
     pcl::fromROSMsg(*msg, pcl_msg);
 
-    // create avg pointcloud
     pcl::PointCloud<pcl::PointXYZI> pcl_msg_avg;
     pcl_msg_avg = this->raw_pointcloud_buffer_[0];
     for (size_t i = 1; i < this->raw_pointcloud_buffer_.size(); i++) {
@@ -366,12 +358,6 @@ void LidarMirrorFOVReshaperCalib::pointcloudCallbackAveraging(
       pcl_msg_avg[j].z /= this->averaging_n_clouds;
       pcl_msg_avg[j].intensity /= this->averaging_n_clouds;
     }
-
-    if (this->auto_define_lm_start_angle_)
-      this->identifyMirrorPoints(pcl_msg_avg, 0, this->auto_define_lm_angle_mode_);
-
-    if (this->auto_define_rm_start_angle_)
-      this->identifyMirrorPoints(pcl_msg_avg, 1, this->auto_define_rm_angle_mode_);
 
     this->splitPointclouds(pcl_msg_avg);
 
@@ -406,12 +392,6 @@ void LidarMirrorFOVReshaperCalib::pointcloudCallback(
     pcl::PointCloud<pcl::PointXYZI> pcl_msg;
     pcl::fromROSMsg(*msg, pcl_msg);
 
-    if (this->auto_define_lm_start_angle_)
-      this->identifyMirrorPoints(pcl_msg, 0, this->auto_define_lm_angle_mode_);
-
-    if (this->auto_define_rm_start_angle_)
-      this->identifyMirrorPoints(pcl_msg, 1, this->auto_define_rm_angle_mode_);
-
     this->splitPointclouds(pcl_msg);
     if (this->averaging_n_clouds > 0) {
       this->averagingResourceBuffers();
@@ -425,174 +405,21 @@ void LidarMirrorFOVReshaperCalib::pointcloudCallback(
 
 void LidarMirrorFOVReshaperCalib::scanCallback(const sensor_msgs::msg::LaserScan::SharedPtr msg)
 {
-  // @todo Test this
-  if (this->laser_scans.size() < this->optimization_buffer_size_) {
-    RCLCPP_INFO(this->get_logger(), "Buffering laser scans... Currently %ld", laser_scans.size());
-    laser_scans.push_back(*msg);
+  if (this->laser_scans_.size() < static_cast<size_t>(this->optimization_buffer_size_)) {
+    RCLCPP_INFO(this->get_logger(), "Buffering laser scans... Currently %ld", laser_scans_.size());
+    laser_scans_.push_back(*msg);
 
     sensor_msgs::msg::PointCloud2::SharedPtr cloud_msg =
       std::make_shared<sensor_msgs::msg::PointCloud2>();
-    sensor_msgs::PointCloud2Modifier modifier(*cloud_msg);
-    modifier.setPointCloud2Fields(
-      4, "x", 1, sensor_msgs::msg::PointField::FLOAT32, "y", 1,
-      sensor_msgs::msg::PointField::FLOAT32, "z", 1, sensor_msgs::msg::PointField::FLOAT32,
-      "intensity", 1, sensor_msgs::msg::PointField::FLOAT32);
-    modifier.resize(msg->ranges.size());
-    sensor_msgs::PointCloud2Iterator<float> iter_x(*cloud_msg, "x");
-    sensor_msgs::PointCloud2Iterator<float> iter_y(*cloud_msg, "y");
-    sensor_msgs::PointCloud2Iterator<float> iter_z(*cloud_msg, "z");
-    sensor_msgs::PointCloud2Iterator<float> iter_intensity(*cloud_msg, "intensity");
 
-    for (size_t i = 0; i < msg->ranges.size(); ++i) {
-      const float range = msg->ranges[i];
-      const float angle = msg->angle_min + i * msg->angle_increment;
-      *iter_x = range * std::cos(angle);
-      *iter_y = range * std::sin(angle);
-      *iter_z = 0.0;
-      *iter_intensity = msg->intensities[i];
-      ++iter_x;
-      ++iter_y;
-      ++iter_z;
-      ++iter_intensity;
-    }
+    // Convert LaserScan to PointCloud2
+    this->projector_.projectLaser(*msg, *cloud_msg);
+
     this->pointcloudCallback(cloud_msg);
   } else {
     this->optimize();
     rclcpp::shutdown();
   }
-};
-
-void LidarMirrorFOVReshaperCalib::identifyMirrorPoints(
-  const pcl::PointCloud<pcl::PointXYZI> & src_cloud, int mirror /* = 0*/, int mode /*=0*/)
-{
-  pcl::PointIndices * min_max_indices = new pcl::PointIndices;
-
-  if (mode == 0) {
-    if (mirror == 0)
-      this->identifyMirrorPointsSlope(
-        src_cloud, this->mirror_left_start_angle_, this->mirror_left_end_angle_);
-    else if (mirror == 1)
-      this->identifyMirrorPointsSlope(
-        src_cloud, this->mirror_right_start_angle_, this->mirror_right_end_angle_);
-    else
-      RCLCPP_ERROR(this->get_logger(), "Invalid mirror for identifyMirrorPoints!");
-  } else if (mode == 1) {
-    RCLCPP_INFO(this->get_logger(), "Identifying mirror points via mean distance...");
-    if (mirror == 0) {
-      this->identifyMirrorPointsMeanDist(
-        src_cloud, this->mirror_left_start_angle_, this->mirror_left_end_angle_, min_max_indices);
-      RCLCPP_INFO(
-        this->get_logger(), "Min idx: %d, Max idx: %d", min_max_indices->indices[0],
-        min_max_indices->indices[1]);
-    } else if (mirror == 1) {
-      this->identifyMirrorPointsMeanDist(
-        src_cloud, this->mirror_right_start_angle_, this->mirror_right_end_angle_, min_max_indices);
-      RCLCPP_INFO(
-        this->get_logger(), "Min idx: %d, Max idx: %d", min_max_indices->indices[0],
-        min_max_indices->indices[1]);
-    } else {
-      RCLCPP_ERROR(this->get_logger(), "Invalid mirror for identifyMirrorPoints!");
-    };
-  } else {
-    RCLCPP_ERROR(this->get_logger(), "Invalid mode for identifyMirrorPoints!");
-  };
-  delete min_max_indices;
-
-  return;
-};
-
-void LidarMirrorFOVReshaperCalib::identifyMirrorPointsMeanDist(
-  const pcl::PointCloud<pcl::PointXYZI> & src_cloud, double inital_guess_min,
-  double inital_guess_max, pcl::PointIndices * min_max_indices, bool apply_sigma /* = false*/)
-{
-  double avg_range = 0.0;
-  double sigma_range = 0.0;
-  std::vector<double> ranges;
-
-  pcl::PointIndices * inital_guess_indices = new pcl::PointIndices;
-  lidarMirrorFOVReshaperTF::getPointcloudIndices(
-    src_cloud, inital_guess_min, inital_guess_max, inital_guess_indices);
-
-  pcl::PointCloud<pcl::PointXYZI> src_cloud_cropped;
-  pcl::copyPointCloud(src_cloud, *inital_guess_indices, src_cloud_cropped);
-  delete inital_guess_indices;
-
-  for (pcl::PointXYZI & point : src_cloud_cropped) {
-    double tmp_dist = std::sqrt(std::pow(point.x, 2) + std::pow(point.y, 2));
-    avg_range += tmp_dist;
-    ranges.push_back(tmp_dist);
-  };
-
-  avg_range /= src_cloud.size();
-
-  for (const double & range : ranges) {
-    sigma_range += std::pow(range - avg_range, 2);
-  };
-  sigma_range = std::sqrt(sigma_range / src_cloud.size());
-
-  std::vector<int> idx_mirror_points;
-  for (size_t i = 0; i < ranges.size(); i++) {
-    if (
-      (std::abs(ranges[i]) < avg_range + sigma_range) &&
-      (std::abs(ranges[i]) > avg_range - sigma_range)) {
-      idx_mirror_points.push_back(i);
-    };
-  };
-
-  int idx_new_min = idx_mirror_points.front();
-  int idx_new_max = idx_mirror_points.back();
-
-  int inital_guess_min_idx = static_cast<int>(inital_guess_min - this->laser_scanner_angle_min_);
-  int inital_guess_max_idx = static_cast<int>(inital_guess_max - this->laser_scanner_angle_min_);
-
-  int diff_ig_min = inital_guess_min_idx - inital_guess_min;
-  int diff_ig_max = inital_guess_max_idx - inital_guess_max;
-
-  min_max_indices->indices.push_back(inital_guess_min_idx + diff_ig_min);
-  min_max_indices->indices.push_back(inital_guess_max_idx + diff_ig_max);
-};
-
-void LidarMirrorFOVReshaperCalib::identifyMirrorPointsSlope(
-  const pcl::PointCloud<pcl::PointXYZI> & src_cloud, double inital_guess_min,
-  double inital_guess_max, int sliding_window_size /* = 0*/)
-{
-  std::vector<double> ranges, slopes;
-
-  pcl::PointIndices * inital_guess_indices = new pcl::PointIndices;
-  lidarMirrorFOVReshaperTF::getPointcloudIndices(
-    src_cloud, inital_guess_min, inital_guess_max, inital_guess_indices);
-
-  pcl::PointCloud<pcl::PointXYZI> src_cloud_cropped;
-  pcl::copyPointCloud(src_cloud, *inital_guess_indices, src_cloud_cropped);
-  delete inital_guess_indices;
-
-  for (size_t i = 0; i < src_cloud_cropped.size(); i++) {
-    ranges.push_back(src_cloud_cropped[i].x);
-  }
-
-  std::vector<int> idx_mirror_points;
-  for (size_t i = 1 + sliding_window_size; i < ranges.size() - sliding_window_size; i++) {
-    double slope = (ranges[i + sliding_window_size] - ranges[i - sliding_window_size]);
-    if (sliding_window_size > 0) slope /= sliding_window_size * 2;
-    slopes.push_back(slope);
-  }
-
-  std::sort(slopes.begin(), slopes.end());
-  double slope_threshold = slopes[static_cast<int>(slopes.size() * 0.95)];
-  RCLCPP_INFO(
-    this->get_logger(), "Slope threshold (95th percentile) determined: %f", slope_threshold);
-
-  for (size_t i = 1; i < slopes.size(); i++) {
-    double slope_delta = std::abs(slopes[i]) - std::abs(slopes[i - 1]);
-    if (slope_delta > std::abs(slope_threshold)) {
-      RCLCPP_INFO(this->get_logger(), "Jump at idx:%ld", i);
-    }
-  }
-
-  this->mirror_right_start_angle_ = 0.0;
-  this->mirror_right_end_angle_ = 0.0;
-  this->mirror_left_start_angle_ = 0.0;
-  this->mirror_left_end_angle_ = 0.0;
 };
 
 void LidarMirrorFOVReshaperCalib::splitPointclouds(
@@ -649,7 +476,8 @@ void LidarMirrorFOVReshaperCalib::addPointCloudToBuffer(
       pc_buffer.push_back(pc_cmp);
   }
 };
-double pointToLineDistance(
+
+double LidarMirrorFOVReshaperCalib::pointToLineDistance(
   const pcl::PointXYZI & point, const Eigen::Vector3d & linePoint,
   const Eigen::Vector3d & lineDirection)
 {
@@ -659,35 +487,34 @@ double pointToLineDistance(
   return crossProduct.norm() / lineDirection.norm();
 };
 
-// Function to fit a line to the point cloud and identify outliers
-std::vector<int> identifyOutliers(const pcl::PointCloud<pcl::PointXYZI> & cloud, double threshold)
+std::vector<int> LidarMirrorFOVReshaperCalib::identifyOutliers(
+  const pcl::PointCloud<pcl::PointXYZI> & cloud, double threshold)
 {
-  size_t n = cloud.size();
-  if (n < 2) {
+  if (cloud.size() < 2) {
     std::cerr << "Not enough points to fit a line." << std::endl;
     return {};
   }
 
-  Eigen::Vector3d mean(0, 0, 0);
+  Eigen::Vector3d mean_vec(0, 0, 0);
   for (const auto & point : cloud) {
-    mean += Eigen::Vector3d(point.x, point.y, point.z);
+    mean_vec += Eigen::Vector3d(point.x, point.y, point.z);
   }
-  mean /= n;
+  mean_vec /= cloud.size();
 
-  Eigen::Matrix3d covariance = Eigen::Matrix3d::Zero();
+  Eigen::Matrix3d cov_mat = Eigen::Matrix3d::Zero();
   for (const auto & point : cloud) {
-    Eigen::Vector3d diff = Eigen::Vector3d(point.x, point.y, point.z) - mean;
-    covariance += diff * diff.transpose();
+    Eigen::Vector3d delta = Eigen::Vector3d(point.x, point.y, point.z) - mean_vec;
+    cov_mat += delta * delta.transpose();
   }
-  covariance /= n;
+  cov_mat /= cloud.size();
 
-  Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eig(covariance);
+  Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eig(cov_mat);
   Eigen::Vector3d lineDirection = eig.eigenvectors().col(2);
 
   std::vector<pcl::PointXYZI> outliers;
   std::vector<int> outlier_indices;
-  for (int i = 0; i < n; ++i) {
-    double distance = pointToLineDistance(cloud.at(i), mean, lineDirection);
+  for (int i = 0; static_cast<size_t>(i) < cloud.size(); ++i) {
+    double distance = pointToLineDistance(cloud.at(i), mean_vec, lineDirection);
     if (distance > threshold) {
       outliers.push_back(cloud.at(i));
       outlier_indices.push_back(i);
@@ -739,17 +566,17 @@ void LidarMirrorFOVReshaperCalib::getHighestIntensityIdx(
     if (
       mirror_left &&
       idx_highest_intensity >= static_cast<int>(pointcloud_buffer[cloud_index].size()) -
-                                 this->mirror_safety_bufferzone_size_lm) {
-      if (this->mirror_safety_bufferzone_size_lm != 0) {
+                                 this->mirror_safety_bufferzone_size_lm_) {
+      if (this->mirror_safety_bufferzone_size_lm_ != 0) {
         RCLCPP_WARN(
           this->get_logger(),
           "Highest intensity point is too close to the right mirror edge! "
           "Index: %d, Intensity: %f\nintensity threshold was set to %f\n Setting index to %d",
           idx_highest_intensity, max_intensity, intensity_threshold,
           (static_cast<int>(pointcloud_buffer[cloud_index].size()) -
-           this->mirror_safety_bufferzone_size_lm - 1));
+           this->mirror_safety_bufferzone_size_lm_ - 1));
         idx_highest_intensity = static_cast<int>(pointcloud_buffer[cloud_index].size()) -
-                                this->mirror_safety_bufferzone_size_lm - 1;
+                                this->mirror_safety_bufferzone_size_lm_ - 1;
       } else {
         RCLCPP_WARN(
           this->get_logger(),
@@ -757,24 +584,24 @@ void LidarMirrorFOVReshaperCalib::getHighestIntensityIdx(
           "Index: %d, Intensity: %f\nintensity threshold was set to %f\n Setting index to %d",
           idx_highest_intensity, max_intensity, intensity_threshold,
           static_cast<int>(pointcloud_buffer[cloud_index].size()) -
-            this->mirror_safety_bufferzone_size_lm);
+            this->mirror_safety_bufferzone_size_lm_);
       };
-    } else if (!mirror_left && idx_highest_intensity <= this->mirror_safety_bufferzone_size_rm) {
-      if (this->mirror_safety_bufferzone_size_rm != 0) {
+    } else if (!mirror_left && idx_highest_intensity <= this->mirror_safety_bufferzone_size_rm_) {
+      if (this->mirror_safety_bufferzone_size_rm_ != 0) {
         RCLCPP_WARN(
           this->get_logger(),
           "Highest intensity point is too close to the left mirror edge! "
           "Index: %d, Intensity: %f\nintensity threshold was set to %f\n Setting index to %d",
           idx_highest_intensity, max_intensity, intensity_threshold,
-          this->mirror_safety_bufferzone_size_rm + 1);
-        idx_highest_intensity = this->mirror_safety_bufferzone_size_rm + 1;
+          this->mirror_safety_bufferzone_size_rm_ + 1);
+        idx_highest_intensity = this->mirror_safety_bufferzone_size_rm_ + 1;
       } else {
         RCLCPP_WARN(
           this->get_logger(),
           "Highest intensity point is too close to the left mirror edge! "
           "Index: %d, Intensity: %f\nintensity threshold was set to %f\n Setting index to %d",
           idx_highest_intensity, max_intensity, intensity_threshold,
-          this->mirror_safety_bufferzone_size_rm);
+          this->mirror_safety_bufferzone_size_rm_);
       }
     }
 
@@ -784,7 +611,7 @@ void LidarMirrorFOVReshaperCalib::getHighestIntensityIdx(
       try {
         if (mirror_left) {
           if (
-            idx_highest_intensity + this->interpolation_window <
+            static_cast<size_t>(idx_highest_intensity + this->interpolation_window) <
             pointcloud_buffer[cloud_index].size())  // all indices used for interpolation are valid
           {
             highest_intensity_interpp = this->interpolate(
@@ -866,8 +693,7 @@ void LidarMirrorFOVReshaperCalib::getHighestIntensityIdx(
       }
     } else if (
       this->interpolation_window == 0 && idx_highest_intensity > 0 &&
-      idx_highest_intensity < pointcloud_buffer[cloud_index].size() - 1) {
-      // interpolate between highest intensity point-1 and highest intensity point+1
+      static_cast<size_t>(idx_highest_intensity) < pointcloud_buffer[cloud_index].size() - 1) {
       pcl::PointXYZI interpolated_point;
       interpolated_point = this->interpolate(
         pointcloud_buffer[cloud_index].at(idx_highest_intensity - 1),
@@ -876,9 +702,8 @@ void LidarMirrorFOVReshaperCalib::getHighestIntensityIdx(
       pointcloud_buffer[cloud_index].at(idx_highest_intensity) = interpolated_point;
     }
 
-    // set intensity for all other points to 0
     for (size_t i = 0; i < pointcloud_buffer[cloud_index].size(); i++) {
-      if (i != idx_highest_intensity) {
+      if (i != static_cast<size_t>(idx_highest_intensity)) {
         pointcloud_buffer[cloud_index].at(i).intensity = 0.0;
       }
     };
@@ -889,6 +714,81 @@ void LidarMirrorFOVReshaperCalib::getHighestIntensityIdx(
   RCLCPP_INFO(
     this->get_logger(), "Avg idx high intensity: %ld (mirror left: %d)",
     std::accumulate(hI_idx.begin(), hI_idx.end(), 0) / hI_idx.size(), mirror_left);
+};
+
+int LidarMirrorFOVReshaperCalib::applyMirrorBoundary(
+  bool mirror_left, int idx_highest_intensity, size_t cloud_size)
+{
+  if (mirror_left) {
+    if (
+      idx_highest_intensity >=
+      static_cast<int>(cloud_size) - this->mirror_safety_bufferzone_size_lm_) {
+      int new_idx = static_cast<int>(cloud_size) - this->mirror_safety_bufferzone_size_lm_ - 1;
+      RCLCPP_WARN(
+        this->get_logger(),
+        "Highest intensity point is too close to the left mirror edge! Index: %d. Setting index "
+        "to %d",
+        idx_highest_intensity, new_idx);
+      return new_idx;
+    }
+  } else {
+    if (idx_highest_intensity <= this->mirror_safety_bufferzone_size_rm_) {
+      int new_idx = this->mirror_safety_bufferzone_size_rm_ + 1;
+      RCLCPP_WARN(
+        this->get_logger(),
+        "Highest intensity point is too close to the right mirror edge! Index: %d. Setting index "
+        "to "
+        "%d",
+        idx_highest_intensity, new_idx);
+      return new_idx;
+    }
+  }
+  return idx_highest_intensity;
+};
+
+void LidarMirrorFOVReshaperCalib::applyInterpolation(
+  bool mirror_left, int idx_highest_intensity, pcl::PointCloud<pcl::PointXYZI> & cloud,
+  double max_intensity)
+{
+  pcl::PointXYZI highest_intensity_interpp, interpolated_point_minus_1, interpolated_point_plus_1;
+
+  if (mirror_left) {
+    if (static_cast<size_t>(idx_highest_intensity) + this->interpolation_window < cloud.size()) {
+      highest_intensity_interpp = this->interpolate(
+        cloud.at(idx_highest_intensity - this->interpolation_window),
+        cloud.at(idx_highest_intensity + this->interpolation_window), 0.5, max_intensity);
+
+      cloud.at(idx_highest_intensity) = highest_intensity_interpp;
+
+      interpolated_point_minus_1 = this->interpolate(
+        cloud.at(idx_highest_intensity - this->interpolation_window),
+        cloud.at(idx_highest_intensity), 0.25, max_intensity);
+      cloud.at(idx_highest_intensity - 1) = interpolated_point_minus_1;
+
+      interpolated_point_plus_1 = this->interpolate(
+        cloud.at(idx_highest_intensity),
+        cloud.at(idx_highest_intensity + this->interpolation_window), 0.25, max_intensity);
+      cloud.at(idx_highest_intensity + 1) = interpolated_point_plus_1;
+    }
+  } else {
+    if (idx_highest_intensity - this->interpolation_window >= 0) {
+      highest_intensity_interpp = this->interpolate(
+        cloud.at(idx_highest_intensity - this->interpolation_window),
+        cloud.at(idx_highest_intensity + this->interpolation_window), 0.5, max_intensity);
+
+      cloud.at(idx_highest_intensity) = highest_intensity_interpp;
+
+      interpolated_point_minus_1 = this->interpolate(
+        cloud.at(idx_highest_intensity - this->interpolation_window),
+        cloud.at(idx_highest_intensity), 0.25, max_intensity);
+      cloud.at(idx_highest_intensity - 1) = interpolated_point_minus_1;
+
+      interpolated_point_plus_1 = this->interpolate(
+        cloud.at(idx_highest_intensity),
+        cloud.at(idx_highest_intensity + this->interpolation_window), 0.25, max_intensity);
+      cloud.at(idx_highest_intensity + 1) = interpolated_point_plus_1;
+    }
+  }
 };
 
 pcl::PointXYZI LidarMirrorFOVReshaperCalib::interpolate(
@@ -904,7 +804,6 @@ pcl::PointXYZI LidarMirrorFOVReshaperCalib::interpolate(
 
 void LidarMirrorFOVReshaperCalib::transformPointclouds()
 {
-  // print normal and support vectors
   RCLCPP_INFO(
     this->get_logger(), "Left mirror normal vector: %f, %f, %f", this->mirror_left_normal_vec_[0],
     this->mirror_left_normal_vec_[1], this->mirror_left_normal_vec_[2]);
@@ -938,8 +837,8 @@ void LidarMirrorFOVReshaperCalib::transformPointclouds()
       transformed_cloud_right_mirror);
 
     if (
-      this->viz_transformed_cloud_all || this->viz_transformed_cloud_lm ||
-      this->viz_transformed_cloud_rm) {
+      this->viz_transformed_cloud_all_ || this->viz_transformed_cloud_lm_ ||
+      this->viz_transformed_cloud_rm_) {
       this->visualizeTransformedPointclouds(
         *transformed_cloud_combined, *transformed_cloud_right_mirror,
         *transformed_cloud_left_mirror);
@@ -955,10 +854,6 @@ void LidarMirrorFOVReshaperCalib::transformPointclouds()
   };
 };
 
-void LidarMirrorFOVReshaperCalib::averagingScan(){
-  // @todo implement
-};
-
 void LidarMirrorFOVReshaperCalib::averagingResourceBuffers()
 {
   pcl::PointCloud<pcl::PointXYZI> averaged_cloud_left_mirror, averaged_cloud_right_mirror,
@@ -972,22 +867,23 @@ void LidarMirrorFOVReshaperCalib::averagingResourceBuffers()
     this->pointcloud_buffer_front_.at(0).size(), pcl::PointXYZI(0, 0, 0, 0));
   averaged_cloud.resize(this->pointcloud_buffer_.at(0).size(), pcl::PointXYZI(0, 0, 0, 0));
 
-  if (this->pointcloud_buffer_left_mirror_.size() == this->averaging_n_clouds) {
+  if (
+    this->pointcloud_buffer_left_mirror_.size() == static_cast<size_t>(this->averaging_n_clouds)) {
     RCLCPP_INFO(
       this->get_logger(), "Averaging pointclouds... Currently %ld",
       this->pointcloud_buffer_left_mirror_.size());
     RCLCPP_INFO(this->get_logger(), "averaging_n_clouds: %d", this->averaging_n_clouds);
-    // averaged_cloud_left_mirror.insert(
-    //   averaged_cloud_left_mirror.end(), this->pointcloud_buffer_left_mirror_[0].begin(),
-    //   this->pointcloud_buffer_left_mirror_[0].end());
-    // averaged_cloud_right_mirror.insert(
-    //   averaged_cloud_right_mirror.end(), this->pointcloud_buffer_right_mirror_[0].begin(),
-    //   this->pointcloud_buffer_right_mirror_[0].end());
-    // averaged_cloud_front.insert(
-    //   averaged_cloud_front.end(), this->pointcloud_buffer_front_[0].begin(),
-    //   this->pointcloud_buffer_front_[0].end());
-    // averaged_cloud.insert(
-    //   averaged_cloud.end(), this->pointcloud_buffer_[0].begin(), this->pointcloud_buffer_[0].end());
+    averaged_cloud_left_mirror.insert(
+      averaged_cloud_left_mirror.end(), this->pointcloud_buffer_left_mirror_[0].begin(),
+      this->pointcloud_buffer_left_mirror_[0].end());
+    averaged_cloud_right_mirror.insert(
+      averaged_cloud_right_mirror.end(), this->pointcloud_buffer_right_mirror_[0].begin(),
+      this->pointcloud_buffer_right_mirror_[0].end());
+    averaged_cloud_front.insert(
+      averaged_cloud_front.end(), this->pointcloud_buffer_front_[0].begin(),
+      this->pointcloud_buffer_front_[0].end());
+    averaged_cloud.insert(
+      averaged_cloud.end(), this->pointcloud_buffer_[0].begin(), this->pointcloud_buffer_[0].end());
     if (
       this->pointcloud_buffer_left_mirror_.size() != this->pointcloud_buffer_right_mirror_.size() ||
       this->pointcloud_buffer_left_mirror_.size() != this->pointcloud_buffer_front_.size() ||
@@ -1002,7 +898,6 @@ void LidarMirrorFOVReshaperCalib::averagingResourceBuffers()
       rclcpp::shutdown();
     };
 
-    // ürint size of all averaged_cloud_left_mirror and all other buffers
     RCLCPP_INFO(
       this->get_logger(), "Size of averaged_cloud_left_mirror: %ld",
       averaged_cloud_left_mirror.size());
@@ -1018,7 +913,6 @@ void LidarMirrorFOVReshaperCalib::averagingResourceBuffers()
 
     try {
       for (size_t i = 0; i < this->pointcloud_buffer_left_mirror_.size(); i++) {
-        // Sum the points in left mirror point cloud buffer
         for (size_t j = 0; j < this->pointcloud_buffer_left_mirror_.at(i).size(); j++) {
           averaged_cloud_left_mirror.at(j).x += this->pointcloud_buffer_left_mirror_[i].at(j).x;
           averaged_cloud_left_mirror.at(j).y += this->pointcloud_buffer_left_mirror_[i].at(j).y;
@@ -1027,7 +921,6 @@ void LidarMirrorFOVReshaperCalib::averagingResourceBuffers()
             this->pointcloud_buffer_left_mirror_[i].at(j).intensity;
         }
 
-        // Sum the points in right mirror point cloud buffer
         for (size_t j = 0; j < this->pointcloud_buffer_right_mirror_.at(i).size(); j++) {
           averaged_cloud_right_mirror.at(j).x += this->pointcloud_buffer_right_mirror_[i].at(j).x;
           averaged_cloud_right_mirror.at(j).y += this->pointcloud_buffer_right_mirror_[i].at(j).y;
@@ -1052,7 +945,6 @@ void LidarMirrorFOVReshaperCalib::averagingResourceBuffers()
           averaged_cloud_front.at(j).intensity += this->pointcloud_buffer_front_[i].at(j).intensity;
         }
 
-        // Sum the points in the general point cloud buffer
         for (size_t j = 0; j < this->pointcloud_buffer_.at(i).size(); j++) {
           averaged_cloud.at(j).x += this->pointcloud_buffer_[i].at(j).x;
           averaged_cloud.at(j).y += this->pointcloud_buffer_[i].at(j).y;
@@ -1065,7 +957,6 @@ void LidarMirrorFOVReshaperCalib::averagingResourceBuffers()
       rclcpp::shutdown();
     }
 
-    // Average the points by dividing by the number of point clouds
     size_t buffer_size = this->pointcloud_buffer_left_mirror_.size();
     for (size_t j = 0; j < averaged_cloud_left_mirror.size(); j++) {
       averaged_cloud_left_mirror.at(j).x /= buffer_size;
@@ -1095,7 +986,6 @@ void LidarMirrorFOVReshaperCalib::averagingResourceBuffers()
       averaged_cloud.at(j).intensity /= buffer_size;
     }
   } else if ((this->pointcloud_buffer_left_mirror_.size() % this->averaging_n_clouds + 1) == 0) {
-    // take the last n scans and average them
     size_t starting_idx = this->pointcloud_buffer_left_mirror_.size() % this->averaging_n_clouds;
     averaged_cloud_left_mirror.insert(
       averaged_cloud_left_mirror.end(), this->pointcloud_buffer_left_mirror_[starting_idx].begin(),
@@ -1155,7 +1045,7 @@ void LidarMirrorFOVReshaperCalib::averagingResourceBuffers()
     // this->pointcloud_buffer_.clear();
     return;
   }
-  for (size_t i = 0; i < this->averaging_n_clouds; i++) {
+  for (size_t i = 0; i < static_cast<size_t>(this->averaging_n_clouds); i++) {
     this->pointcloud_buffer_left_mirror_.pop_back();
     this->pointcloud_buffer_right_mirror_.pop_back();
     this->pointcloud_buffer_front_.pop_back();
@@ -1181,11 +1071,11 @@ void LidarMirrorFOVReshaperCalib::getTargetPoint(
   if (!mode) {
     this->getHighestIntensityIdx(pointcloud_buffer, hI_idx, mirror_left);
     return;
-  };
+  }
 
   for (size_t cloud_index = 0; cloud_index < pointcloud_buffer.size(); ++cloud_index) {
     std::vector<int> outliers =
-      identifyOutliers(pointcloud_buffer[cloud_index], this->filter_dist_threshold);
+      identifyOutliers(pointcloud_buffer[cloud_index], this->filter_dist_threshold_);
     std::vector<pcl::PointXYZI> outliers_points(outliers.size(), pcl::PointXYZI(0, 0, 0, 0));
     for (size_t i = 0; i < outliers.size(); i++) {
       outliers_points.at(i) = (pointcloud_buffer[cloud_index].at(outliers[i]));
@@ -1201,19 +1091,18 @@ void LidarMirrorFOVReshaperCalib::getTargetPoint(
     if (outliers.size() > 1) {
       idx_highest_intensity = std::distance(
         outlier_dists.begin(), std::max_element(outlier_dists.begin(), outlier_dists.end()));
-
     } else if (outliers.size() == 0) {
       RCLCPP_ERROR(
         this->get_logger(),
         "No outliers found!. Possible reason: filter_distance_threshold too high, currently set to "
         "%f",
-        this->filter_dist_threshold);
+        this->filter_dist_threshold_);
       return;
     } else {
       idx_highest_intensity = outliers[0];
     }
 
-    if (idx_highest_intensity >= pointcloud_buffer.at(cloud_index).size()) {
+    if (static_cast<size_t>(idx_highest_intensity) >= pointcloud_buffer.at(cloud_index).size()) {
       RCLCPP_ERROR(
         this->get_logger(), "Index of highest intensity point is out of bounds! Index: %d",
         idx_highest_intensity);
@@ -1225,7 +1114,7 @@ void LidarMirrorFOVReshaperCalib::getTargetPoint(
     pcl::PointXYZI interpolated_point, interpolated_point_m1, interpolated_point_p1;
     if (
       idx_highest_intensity >= 2 &&
-      idx_highest_intensity < pointcloud_buffer[cloud_index].size() - 2) {
+      static_cast<size_t>(idx_highest_intensity) < pointcloud_buffer[cloud_index].size() - 2) {
       interpolated_point = this->interpolate(
         pointcloud_buffer[cloud_index].at(idx_highest_intensity - 2),
         pointcloud_buffer[cloud_index].at(idx_highest_intensity + 2), 0.5, max_intensity);
@@ -1242,7 +1131,7 @@ void LidarMirrorFOVReshaperCalib::getTargetPoint(
       pointcloud_buffer[cloud_index].at(idx_highest_intensity + 1) = interpolated_point_p1;
     } else if (
       idx_highest_intensity >= 1 &&
-      idx_highest_intensity < pointcloud_buffer[cloud_index].size() - 1) {
+      static_cast<size_t>(idx_highest_intensity) < pointcloud_buffer[cloud_index].size() - 1) {
       interpolated_point = this->interpolate(
         pointcloud_buffer[cloud_index].at(idx_highest_intensity - 1),
         pointcloud_buffer[cloud_index].at(idx_highest_intensity + 1), 0.5, max_intensity);
@@ -1263,68 +1152,77 @@ void LidarMirrorFOVReshaperCalib::optimize()
   this->getTargetPoint(
     this->pointcloud_buffer_right_mirror_, this->indices_high_intensity_rm_, 0, 0);
 
+  if (!this->indices_high_intensity_lm_.size() || !this->indices_high_intensity_rm_.size()) {
+    RCLCPP_ERROR(
+      this->get_logger(),
+      "No high intensity points found! (LM: %ld; RM:%ld)\nOptimization not possible! Exiting...",
+      this->indices_high_intensity_lm_.size(), this->indices_high_intensity_rm_.size());
+    return;
+  }
+
   this->transformPointclouds();
+
   RCLCPP_INFO(
     this->get_logger(), "Size per buffer: %ld", this->pointcloud_buffer_left_mirror_.size());
 
   if (!this->indices_high_intensity_lm_.size() || !this->indices_high_intensity_rm_.size()) {
     RCLCPP_ERROR(
-      this->get_logger(), "No high intensity points found!\nOptimization not possible! Exiting...");
+      this->get_logger(),
+      "No high intensity points found! (LM: %ld; RM:%ld)\nOptimization not possible! Exiting...",
+      this->indices_high_intensity_lm_.size(), this->indices_high_intensity_rm_.size());
     return;
   }
 
   this->opt_flag_ = 0;
 
   if (this->optimization_opt_mirror_orientation_ && !this->optimization_opt_mirror_support_vec_) {
-    RCLCPP_INFO(this->get_logger(), "Optimizing mirror orientation...");
+    RCLCPP_INFO(this->get_logger(), "Calibrating mirror orientation...");
     bool status_opt_mirror_orientation = this->optimizeMirrorOrientations();
     if (!status_opt_mirror_orientation)
-      RCLCPP_ERROR(this->get_logger(), "Optimization of mirror orientation failed!");
+      RCLCPP_ERROR(this->get_logger(), "Calibration of mirror orientation failed!");
   } else if (
     !this->optimization_opt_mirror_orientation_ && this->optimization_opt_mirror_support_vec_) {
-    RCLCPP_INFO(this->get_logger(), "Optimizing mirror support vectors...");
+    RCLCPP_INFO(this->get_logger(), "Calibrating mirror support vectors...");
     bool status_opt_mirror_support_vec = this->optimizeMirrorSupportVectors();
     if (!status_opt_mirror_support_vec)
-      RCLCPP_ERROR(this->get_logger(), "Optimization of mirror support vector failed!");
+      RCLCPP_ERROR(this->get_logger(), "Calibration of mirror support vector failed!");
   } else if (
     this->optimization_opt_mirror_orientation_ && this->optimization_opt_mirror_support_vec_) {
-    RCLCPP_INFO(this->get_logger(), "Optimizing mirror orientation and support vectors...");
-    bool status_opt_mirror_orientation = this->optimizeMirrorOrientations();
-    bool status_opt_mirror_support_vec = this->optimizeMirrorSupportVectors();
-
-    if (!status_opt_mirror_orientation || !status_opt_mirror_support_vec)
-      RCLCPP_ERROR(
-        this->get_logger(),
-        "Optimization of mirror orientation and support vector "
-        "failed!\n"
-        "Status of mirror orientation optimization:\n%d\n"
-        "Status of mirror support vector optimization:\n%d\n",
-        status_opt_mirror_orientation, status_opt_mirror_support_vec);
+    RCLCPP_ERROR(
+      this->get_logger(),
+      "Parallel optimization of mirror orientation and mirror support vector not supported, since "
+      "both rely on different input data/calibration-settings!");
+    return;
   } else {
     RCLCPP_ERROR(
       this->get_logger(),
       "No optimization method selected!\n"
       "Check your parameters!");
   };
-  RCLCPP_INFO(this->get_logger(), "Optimization finished!");
-  RCLCPP_INFO(
-    this->get_logger(),
-    "Optimization Results Angles:\nPitch left mirror: %f\nPitch right mirror: %f\nYaw left mirror: "
-    "%f\nYaw right mirror: %f",
-    this->rad2deg(this->optimization_results_.pitch_left_mirror),
-    this->rad2deg(this->optimization_results_.pitch_right_mirror),
-    this->rad2deg(this->optimization_results_.yaw_left_mirror),
-    this->rad2deg(this->optimization_results_.yaw_right_mirror));
 
-  size_t optimization_id = std::hash<std::string>{}(
-    std::to_string(std::chrono::system_clock::now().time_since_epoch().count()));
+  if (this->optimization_opt_mirror_orientation_) {
+    RCLCPP_INFO(this->get_logger(), "Calibration finished!");
+    RCLCPP_INFO(
+      this->get_logger(),
+      "Calibration Results Angles:\n"
+      "Pitch left mirror  : %10.3f (deg)\n"
+      "Pitch right mirror : %10.3f (deg)\n"
+      "Yaw left mirror    : %10.3f (deg)\n"
+      "Yaw right mirror   : %10.3f (deg)",
+      this->rad2deg(this->optimization_results_.pitch_left_mirror),
+      this->rad2deg(this->optimization_results_.pitch_right_mirror),
+      this->rad2deg(this->optimization_results_.yaw_left_mirror),
+      this->rad2deg(this->optimization_results_.yaw_right_mirror));
 
-  if (this->write_optimized_params_) this->writeOptimizationResults();
-  if (this->write_optimization_history_)
-    this->exportOptimizationHistory(
-      this->optimization_results_.history,
-      this->get_parameter("optimization.optimization_history_file").as_string(),
-      std::to_string(optimization_id));
+    size_t optimization_id = std::hash<std::string>{}(
+      std::to_string(std::chrono::system_clock::now().time_since_epoch().count()));
+
+    if (this->write_optimized_params_) this->writeOptimizationResults();
+    if (this->write_optimization_history_)
+      this->exportOptimizationHistory(
+        this->optimization_results_.history, this->optimization_history_file_,
+        std::to_string(optimization_id));
+  }
 
   rclcpp::shutdown();
 };
@@ -1333,36 +1231,35 @@ void LidarMirrorFOVReshaperCalib::writeOptimizationResultsMetadata(
   std::ofstream & meta_file, std::string & method_name)
 {
   std::vector<bool> opt_flags_rm_sv = {
-    this->opt_mirror_orientation_rm_sv_x, this->opt_mirror_orientation_rm_sv_y,
-    this->opt_mirror_orientation_rm_sv_z};
+    this->opt_mirror_orientation_rm_sv_x_, this->opt_mirror_orientation_rm_sv_y_,
+    this->opt_mirror_orientation_rm_sv_z_};
   std::vector<bool> opt_flags_rm_nv = {
-    this->opt_mirror_orientation_rm_nv_x, this->opt_mirror_orientation_rm_nv_y,
-    this->opt_mirror_orientation_rm_nv_z};
+    this->opt_mirror_orientation_rm_nv_x_, this->opt_mirror_orientation_rm_nv_y_,
+    this->opt_mirror_orientation_rm_nv_z_};
 
   std::vector<bool> opt_flags_lm_sv = {
     this->opt_mirror_orientation_lm_sv_x, this->opt_mirror_orientation_lm_sv_y,
     this->opt_mirror_orientation_lm_sv_z};
 
   std::vector<bool> opt_flags_lm_nv = {
-    this->opt_mirror_orientation_lm_nv_x, this->opt_mirror_orientation_lm_nv_y,
-    this->opt_mirror_orientation_lm_nv_z};
+    this->opt_mirror_orientation_lm_nv_x_, this->opt_mirror_orientation_lm_nv_y_,
+    this->opt_mirror_orientation_lm_nv_z_};
 
   std::vector<bool> opt_flags_plane_sv = {
-    this->opt_mirror_orientation_plane_sv_x, this->opt_mirror_orientation_plane_sv_y,
-    this->opt_mirror_orientation_plane_sv_z};
+    this->opt_mirror_orientation_plane_sv_x_, this->opt_mirror_orientation_plane_sv_y_,
+    this->opt_mirror_orientation_plane_sv_z_};
 
   std::vector<bool> opt_flags_plane_nv = {
-    this->opt_mirror_orientation_plane_nv_x, this->opt_mirror_orientation_plane_nv_y,
-    this->opt_mirror_orientation_plane_nv_z};
+    this->opt_mirror_orientation_plane_nv_x_, this->opt_mirror_orientation_plane_nv_y_,
+    this->opt_mirror_orientation_plane_nv_z_};
 
   meta_file << "\n";
   meta_file << method_name << ",";
-  meta_file << this->get_parameter("setting").as_double() << ",";
   meta_file << this->optimization_buffer_size_ << ",";
   meta_file << std::fixed << std::setprecision(5) << this->optimization_epsabs_ << ",";
-  meta_file << this->roundTo4Decimals(this->optimization_stepsize_) << ",";
+  meta_file << this->roundToNDecimals(this->optimization_stepsize_) << ",";
   meta_file << this->optimization_iter_max_ << ",";
-  meta_file << this->numOptAlgorithm2String(this->num_opt_algorithm).c_str() << ",";
+  meta_file << this->numOptAlgorithm2String(this->num_opt_algorithm_).c_str() << ",";
   meta_file << this->vectorToString(opt_flags_lm_sv) << ",";
   meta_file << this->vectorToString(opt_flags_lm_nv) << ",";
   meta_file << this->vectorToString(opt_flags_rm_sv) << ",";
@@ -1398,37 +1295,37 @@ void LidarMirrorFOVReshaperCalib::writeOptimizationResultsStats(
 {
   results_stats_file << "\n";
   results_stats_file << method_name << ",";
-  results_stats_file << this->roundTo4Decimals(this->optimization_results_.rms_all) << ",";
-  results_stats_file << this->roundTo4Decimals(this->optimization_results_.rms_lm_reflectionpoint)
+  results_stats_file << this->roundToNDecimals(this->optimization_results_.rms_all) << ",";
+  results_stats_file << this->roundToNDecimals(this->optimization_results_.rms_lm_reflectionpoint)
                      << ",";
-  results_stats_file << this->roundTo4Decimals(this->optimization_results_.rms_rm_reflectionpoint)
+  results_stats_file << this->roundToNDecimals(this->optimization_results_.rms_rm_reflectionpoint)
                      << ",";
-  results_stats_file << this->roundTo4Decimals(this->optimization_results_.rms_non_rp_all) << ",";
-  results_stats_file << this->roundTo4Decimals(this->optimization_results_.rms_plane_lm) << ",";
-  results_stats_file << this->roundTo4Decimals(this->optimization_results_.rms_plane_rm) << ",";
-  results_stats_file << this->roundTo4Decimals(this->optimization_results_.rms_front) << ",";
+  results_stats_file << this->roundToNDecimals(this->optimization_results_.rms_non_rp_all) << ",";
+  results_stats_file << this->roundToNDecimals(this->optimization_results_.rms_plane_lm) << ",";
+  results_stats_file << this->roundToNDecimals(this->optimization_results_.rms_plane_rm) << ",";
+  results_stats_file << this->roundToNDecimals(this->optimization_results_.rms_front) << ",";
   results_stats_file << this->rad2deg(this->optimization_results_.roll_left_mirror) << ",";
   results_stats_file << this->rad2deg(this->optimization_results_.roll_right_mirror) << ",";
   results_stats_file << this->rad2deg(this->optimization_results_.pitch_left_mirror) << ",";
   results_stats_file << this->rad2deg(this->optimization_results_.pitch_right_mirror) << ",";
   results_stats_file << this->rad2deg(this->optimization_results_.yaw_left_mirror) << ",";
   results_stats_file << this->rad2deg(this->optimization_results_.yaw_right_mirror) << ",";
-  results_stats_file << this->roundTo4Decimals(
+  results_stats_file << this->roundToNDecimals(
                           this->optimization_results_.stddev_rms_minibatches_all)
                      << ",";
-  results_stats_file << this->roundTo4Decimals(
+  results_stats_file << this->roundToNDecimals(
                           this->optimization_results_.stddev_rms_minibatches_non_rp_all)
                      << ",";
-  results_stats_file << this->roundTo4Decimals(
+  results_stats_file << this->roundToNDecimals(
                           this->optimization_results_.stddev_rms_minibatches_lm_rp)
                      << ",";
-  results_stats_file << this->roundTo4Decimals(
+  results_stats_file << this->roundToNDecimals(
                           this->optimization_results_.stddev_rms_minibatches_rm_rp)
                      << ",";
-  results_stats_file << this->roundTo4Decimals(
+  results_stats_file << this->roundToNDecimals(
                           this->optimization_results_.stddev_rms_minibatches_lm_all)
                      << ",";
-  results_stats_file << this->roundTo4Decimals(
+  results_stats_file << this->roundToNDecimals(
                           this->optimization_results_.stddev_rms_minibatches_rm_all)
                      << ",";
   results_stats_file << this->rad2deg(this->optimization_results_.stddev_roll_lm) << ",";
@@ -1437,10 +1334,10 @@ void LidarMirrorFOVReshaperCalib::writeOptimizationResultsStats(
   results_stats_file << this->rad2deg(this->optimization_results_.stddev_pitch_rm) << ",";
   results_stats_file << this->rad2deg(this->optimization_results_.stddev_yaw_lm) << ",";
   results_stats_file << this->rad2deg(this->optimization_results_.stddev_yaw_rm) << ",";
-  results_stats_file << this->roundTo4Decimals(this->optimization_results_.stddev_angle_zero)
+  results_stats_file << this->roundToNDecimals(this->optimization_results_.stddev_angle_zero)
                      << ",";
-  results_stats_file << this->roundTo4Decimals(this->optimization_results_.stddev_dist_rm) << ",";
-  results_stats_file << this->roundTo4Decimals(this->optimization_results_.stddev_dist_lm) << ",";
+  results_stats_file << this->roundToNDecimals(this->optimization_results_.stddev_dist_rm) << ",";
+  results_stats_file << this->roundToNDecimals(this->optimization_results_.stddev_dist_lm) << ",";
   results_stats_file << this->optimization_results_.no_batches << ",";
   results_stats_file << this->optimization_results_.batch_size << ",";
   results_stats_file << this->vectorToString(this->mirror_left_normal_vec_) << ",";
@@ -1482,9 +1379,8 @@ void LidarMirrorFOVReshaperCalib::writeOptimizationResults()
   };
 
   std::string perm_meta_filepath = meta_output_dir + this->optimized_params_meta_file_;
-  std::string perm_results_filepath =
-    this->get_parameter("optimization.optimized_params_out_dir").as_string() +
-    this->optimized_params_file_;
+
+  std::string perm_results_filepath = meta_output_dir + this->optimized_params_file_;
 
   // check if file exists
   struct stat buffer;
@@ -1495,13 +1391,17 @@ void LidarMirrorFOVReshaperCalib::writeOptimizationResults()
     perm_results_file.open(perm_results_filepath, std::ios::app);
     perm_results_file
       << "method_name,rms_all,rms_lm_reflectionpoint,rms_rm_reflectionpoint,rms_non_rp_all,"
+         "rms_plane_lm,rms_plane_rm,rms_front,"
          "roll_left_mirror,roll_right_mirror,pitch_left_mirror,pitch_right_mirror,"
-         "yaw_left_mirror,yaw_right_mirror,stddev_rms_minibatches_all,stddev_rms_minibatches_"
-         "front,"
-         "stddev_rms_minibatches_lm_rp,stddev_rms_minibatches_rm_rp,stddev_angle_zero,no_batches,"
-         "batch_"
-         "size",
-      "normal_vec_lm", "normal_vec_rm";
+         "yaw_left_mirror,yaw_right_mirror,"
+         "stddev_rms_minibatches_all,stddev_rms_minibatches_non_rp_all,"
+         "stddev_rms_minibatches_lm_rp,stddev_rms_minibatches_rm_rp,"
+         "stddev_rms_minibatches_lm_all,stddev_rms_minibatches_rm_all,"
+         "stddev_roll_lm,stddev_roll_rm,stddev_pitch_lm,stddev_pitch_rm,"
+         "stddev_yaw_lm,stddev_yaw_rm,stddev_angle_zero,"
+         "stddev_dist_rm,stddev_dist_lm,"
+         "no_batches,batch_size,"
+         "normal_vec_lm,normal_vec_rm";
     perm_results_file.close();
   };
   if (stat(perm_meta_filepath.c_str(), &buffer) != 0) {
@@ -1509,7 +1409,7 @@ void LidarMirrorFOVReshaperCalib::writeOptimizationResults()
     std::ofstream perm_meta_file;
     perm_meta_file.open(perm_meta_filepath, std::ios::app);
     perm_meta_file
-      << "method_name,setting,buffer_size,epsabs,stepsize,iter_max,optimization_method,"
+      << "method_name,buffer_size,epsabs,stepsize,iter_max,optimization_method,"
          "opt_flags_lm_sv,opt_flags_lm_nv,"
          "opt_flags_rm_sv,opt_flags_rm_nv,"
          "opt_flags_plane_sv,opt_flags_plane_nv,"
@@ -1566,31 +1466,31 @@ int LidarMirrorFOVReshaperCalib::getCSVrowcount(std::string & filename)
 
 void LidarMirrorFOVReshaperCalib::initConstraints(std::vector<bool> * opt_constraints)
 {
-  if (this->opt_mirror_orientation_all) {
+  if (this->opt_mirror_orientation_all_) {
     std::fill(opt_constraints->begin(), opt_constraints->end(), true);
     return;
   }
 
-  opt_constraints->at(0) = this->opt_mirror_orientation_plane_sv_x;
-  opt_constraints->at(1) = this->opt_mirror_orientation_plane_sv_y;
-  opt_constraints->at(2) = this->opt_mirror_orientation_plane_sv_z;
-  opt_constraints->at(3) = this->opt_mirror_orientation_plane_nv_x;
-  opt_constraints->at(4) = this->opt_mirror_orientation_plane_nv_y;
-  opt_constraints->at(5) = this->opt_mirror_orientation_plane_nv_z;
-  opt_constraints->at(6) = this->opt_mirror_orientation_rm_sv_x;
-  opt_constraints->at(7) = this->opt_mirror_orientation_rm_sv_y;
-  opt_constraints->at(8) = this->opt_mirror_orientation_rm_sv_z;
-  opt_constraints->at(9) = this->opt_mirror_orientation_rm_nv_x;
-  opt_constraints->at(10) = this->opt_mirror_orientation_rm_nv_y;
-  opt_constraints->at(11) = this->opt_mirror_orientation_rm_nv_z;
+  opt_constraints->at(0) = this->opt_mirror_orientation_plane_sv_x_;
+  opt_constraints->at(1) = this->opt_mirror_orientation_plane_sv_y_;
+  opt_constraints->at(2) = this->opt_mirror_orientation_plane_sv_z_;
+  opt_constraints->at(3) = this->opt_mirror_orientation_plane_nv_x_;
+  opt_constraints->at(4) = this->opt_mirror_orientation_plane_nv_y_;
+  opt_constraints->at(5) = this->opt_mirror_orientation_plane_nv_z_;
+  opt_constraints->at(6) = this->opt_mirror_orientation_rm_sv_x_;
+  opt_constraints->at(7) = this->opt_mirror_orientation_rm_sv_y_;
+  opt_constraints->at(8) = this->opt_mirror_orientation_rm_sv_z_;
+  opt_constraints->at(9) = this->opt_mirror_orientation_rm_nv_x_;
+  opt_constraints->at(10) = this->opt_mirror_orientation_rm_nv_y_;
+  opt_constraints->at(11) = this->opt_mirror_orientation_rm_nv_z_;
   opt_constraints->at(12) = this->opt_mirror_orientation_lm_sv_x;
   opt_constraints->at(13) = this->opt_mirror_orientation_lm_sv_y;
   opt_constraints->at(14) = this->opt_mirror_orientation_lm_sv_z;
-  opt_constraints->at(15) = this->opt_mirror_orientation_lm_nv_x;
-  opt_constraints->at(16) = this->opt_mirror_orientation_lm_nv_y;
-  opt_constraints->at(17) = this->opt_mirror_orientation_lm_nv_z;
+  opt_constraints->at(15) = this->opt_mirror_orientation_lm_nv_x_;
+  opt_constraints->at(16) = this->opt_mirror_orientation_lm_nv_y_;
+  opt_constraints->at(17) = this->opt_mirror_orientation_lm_nv_z_;
 
-  if (this->opt_mirror_orientation_mirror_svs) {
+  if (this->opt_mirror_orientation_mirror_svs_) {
     std::fill(opt_constraints->begin() + 6, opt_constraints->begin() + 9, true);    // right mirror
     std::fill(opt_constraints->begin() + 12, opt_constraints->begin() + 15, true);  // left mirror
   }
@@ -1600,7 +1500,7 @@ void LidarMirrorFOVReshaperCalib::initConstraints(std::vector<bool> * opt_constr
   //   std::fill(opt_constraints->begin() + 12, opt_constraints->begin() + 15, false); // left mirror
   // }
 
-  if (this->opt_mirror_orientation_mirror_nvs) {
+  if (this->opt_mirror_orientation_mirror_nvs_) {
     std::fill(opt_constraints->begin() + 9, opt_constraints->begin() + 12, true);   // right mirror
     std::fill(opt_constraints->begin() + 15, opt_constraints->begin() + 18, true);  // left mirror
   }
@@ -1610,7 +1510,7 @@ void LidarMirrorFOVReshaperCalib::initConstraints(std::vector<bool> * opt_constr
   //   std::fill(opt_constraints->begin() + 15, opt_constraints->begin() + 18, false); // left mirror
   // }
 
-  if (this->opt_mirror_orientation_plane_sv) {
+  if (this->opt_mirror_orientation_plane_sv_) {
     std::fill(opt_constraints->begin(), opt_constraints->begin() + 3, true);  // plane
   }
   // else
@@ -1697,13 +1597,13 @@ void LidarMirrorFOVReshaperCalib::optimizeVerbose(
         opt_params.right_mirror_high_intensity_indices.begin() + (i + 1) * batch_size);
 
       RCLCPP_INFO(
-        rclcpp::get_logger("OSG_TF"), "Optimizing batch %d, size: %ld", i,
+        this->get_logger(), "Optimizing batch %d, size: %ld", i,
         opt_params_tmp.src_cloud_vec.size());
 
       this->optimizeNonVerbose(
         opt_params_tmp, plane_support_vec_raw, plane_normal_vec_raw, mirror_right_support_vec_raw,
         mirror_right_normal_vec_raw, mirror_left_support_vec_raw, mirror_left_normal_vec_raw,
-        no_opt_params, epsabs, stepsize, iter_max, false);
+        no_opt_params, epsabs, stepsize, iter_max);
 
       rms_all_batches.push_back(opt_params_tmp.opt_result->rms_all);
       rms_non_rp_batches.push_back(opt_params_tmp.opt_result->rms_non_rp_all);
@@ -1731,7 +1631,7 @@ void LidarMirrorFOVReshaperCalib::optimizeVerbose(
     batch_size = opt_params.src_cloud_vec.size();
 
   RCLCPP_INFO(
-    rclcpp::get_logger("OSG_TF"), "Batch optimization done, now optimizing on all data\n");
+    rclcpp::get_logger("LMFR_TF"), "Batch optimization done, now optimizing on all data\n");
 
   // run optimization on all data
   optimization_params opt_params_all;
@@ -1749,7 +1649,7 @@ void LidarMirrorFOVReshaperCalib::optimizeVerbose(
   this->optimizeNonVerbose(
     opt_params_all, plane_support_vec, plane_normal_vec, mirror_right_support_vec,
     mirror_right_normal_vec, mirror_left_support_vec, mirror_left_normal_vec, no_opt_params, epsabs,
-    stepsize, iter_max, true);
+    stepsize, iter_max);
 
   double rms_all_batches_stddev = lidarMirrorFOVReshaperTF::getStdDev(rms_all_batches);
   double rms_non_rp_all_batches_stddev = lidarMirrorFOVReshaperTF::getStdDev(rms_non_rp_batches);
@@ -1766,15 +1666,13 @@ void LidarMirrorFOVReshaperCalib::optimizeVerbose(
   double stddev_rm_pitch = lidarMirrorFOVReshaperTF::getStdDev(pitch_rm_batches);
   double stddev_rm_yaw = lidarMirrorFOVReshaperTF::getStdDev(yaw_rm_batches);
 
-  RCLCPP_INFO(
-    rclcpp::get_logger("OSG_TF"),
-    "Optimization summary:\n"
-    "stddev of rms_all: %f\n",
-    rms_all_batches_stddev);
-
-  RCLCPP_INFO(
-    rclcpp::get_logger("OSG_TF"), " YAWS ALL SIZE: %d\n",
-    opt_params_all.opt_result->history.yaw_left_mirror.size());
+  if (this->optimization_evaluation_no_batches_ > 1) {
+    RCLCPP_INFO(
+      this->get_logger(),
+      "Calibration summary:\n"
+      "stddev of rms_all: %f\n",
+      rms_all_batches_stddev);
+  }
 
   opt_params.opt_result->stddev_rms_minibatches_all = rms_all_batches_stddev;
   opt_params.opt_result->stddev_rms_minibatches_non_rp_all = rms_non_rp_all_batches_stddev;
@@ -1820,9 +1718,13 @@ void LidarMirrorFOVReshaperCalib::optimizeNonVerbose(
   std::vector<double> & plane_normal_vec, std::vector<double> & mirror_right_support_vec,
   std::vector<double> & mirror_right_normal_vec, std::vector<double> & mirror_left_support_vec,
   std::vector<double> & mirror_left_normal_vec, const int & no_opt_params, const double & epsabs,
-  const double & stepsize, const size_t & iter_max, bool plot_error /*= false*/)
+  const double & stepsize, const size_t & iter_max)
 {
-  nlopt_opt opt = nlopt_create(this->num_opt_algorithm, no_opt_params);
+  RCLCPP_INFO(
+    this->get_logger(),
+    "Used NLopt algorithm implementation does not support setting stepsize (Set to: %f)", stepsize);
+
+  nlopt_opt opt = nlopt_create(this->num_opt_algorithm_, no_opt_params);
 
   nlopt_set_min_objective(opt, LidarMirrorFOVReshaperCalib::errFnMirrorFix, &opt_params);
 
@@ -1851,9 +1753,9 @@ void LidarMirrorFOVReshaperCalib::optimizeNonVerbose(
 
   std::vector<bool> * opt_constraints = opt_params.opt_constraints;
   if (opt_constraints != NULL) {
-    if (opt_constraints->size() != no_opt_params) {
+    if (opt_constraints->size() != static_cast<size_t>(no_opt_params)) {
       RCLCPP_ERROR(
-        rclcpp::get_logger("OSG_TF"),
+        this->get_logger(),
         "Error: input constraints vector is not of size 18, size of input constraints vector: %ld",
         opt_constraints->size());
       return;
@@ -1863,18 +1765,10 @@ void LidarMirrorFOVReshaperCalib::optimizeNonVerbose(
       if (!opt_constraints->at(i)) {
         nlopt_set_lower_bound(opt, i, x[i]);
         nlopt_set_upper_bound(opt, i, x[i]);
-        RCLCPP_INFO(
-          rclcpp::get_logger("OSG_TF"), "Constraint applied on parameter %d, value: %f", i, x[i]);
+        RCLCPP_INFO(this->get_logger(), "Constraint applied on parameter %d, value: %f", i, x[i]);
       }
     }
   };
-
-  // set calib plane to be 90deg
-  // nlopt_set_lower_bound(opt, 4, plane_normal_vec[1]);
-  // nlopt_set_upper_bound(opt, 4, plane_normal_vec[1]);
-
-  // nlopt_set_lower_bound(opt, 5, plane_normal_vec[2]);
-  // nlopt_set_upper_bound(opt, 5, plane_normal_vec[2]);
 
   double minf;
   int no_iterations = 0;
@@ -1898,19 +1792,18 @@ void LidarMirrorFOVReshaperCalib::optimizeNonVerbose(
     opt_status_str = nlopt_result_to_string((nlopt_result)res);
   } catch (const std::out_of_range & oor) {
     RCLCPP_ERROR(
-      rclcpp::get_logger("OSG_TF"),
-      "Decoding optimization status failed.\nRaw encoded status code: %d", res);
+      this->get_logger(), "Decoding optimization status failed.\nRaw encoded status code: %d", res);
   };
 
   RCLCPP_INFO(
-    rclcpp::get_logger("OSG_TF"),
+    this->get_logger(),
     "\nOptimization took %ld (ms)\n"
-    "Optimization iterations: %d\n"
-    "Optimization result(mm): %f\n"
-    "Optimization status: %s\n",
+    "Calibration iterations: %d\n"
+    "Calibration result (rms_all): %f(mm)\n"
+    "Calibration status: %s\n",
     duration.count() / 1000, no_iterations, (minf * 1000), opt_status_str.c_str());
 
-  RCLCPP_INFO(this->get_logger(), "Optimization done\n");
+  RCLCPP_INFO(this->get_logger(), "Calibration done\n");
 
   opt_params.opt_result->optimization_status = res;
 
@@ -1920,6 +1813,11 @@ void LidarMirrorFOVReshaperCalib::optimizeNonVerbose(
 double LidarMirrorFOVReshaperCalib::errFnMirrorFix(
   unsigned n, const double * x, double * grad, void * function_params)
 {
+  (void)n;  // remove unused variable warning, wont be used in future since n is determined by the
+            // number of parameters given
+  (void)
+    grad;  // remove unused variable warning, wont be used in future since problem can only be solved by gradient free methods
+
   // Unwrap values from the array x
   const size_t vector_size = 3;
   std::vector<double> plane_support_vec(x, x + vector_size);
@@ -1978,27 +1876,6 @@ double LidarMirrorFOVReshaperCalib::errFnMirrorFix(
   double rms_mirror_right_all = 0;  // all points mirrored by right mirror onto the calib plane
   double rms_mirror_left_all = 0;   // all points mirrored by left mirror onto the calib plane
   double rms_front = 0;             // all rays from front to calib plane
-
-  std::vector<double> dist_values_unsquared_rmidx5, dist_values_unsquared_lmidx5;
-
-  // iter over all lm and rm points and calculate pointplane dist of idx 5
-  for (size_t i = 0; i < transformed_cloud_left_mirror.size(); i++) {
-    std::vector<double> point_plane_distances;
-
-    lidarMirrorFOVReshaperTF::calcPointPlaneDist(
-      transformed_cloud_left_mirror[i], plane_support_vec, plane_normal_vec,
-      &point_plane_distances);
-
-    dist_values_unsquared_lmidx5.push_back(std::abs(point_plane_distances[0]));
-  }
-  for (size_t i = 0; i < transformed_cloud_right_mirror.size(); i++) {
-    std::vector<double> point_plane_distances;
-
-    lidarMirrorFOVReshaperTF::calcPointPlaneDist(
-      transformed_cloud_right_mirror[i], plane_support_vec, plane_normal_vec,
-      &point_plane_distances);
-    dist_values_unsquared_rmidx5.push_back(std::abs(point_plane_distances[0]));
-  }
 
   // remove points from each cloud where intensity > 50% max
   std::vector<pcl::PointCloud<pcl::PointXYZI>> transformed_cloud_left_mirror_filtered;
@@ -2174,7 +2051,6 @@ double LidarMirrorFOVReshaperCalib::errFnMirrorFix(
   rms_mirror_right_all /= num_points_right;  // all rays from right mirror to calib plane
   rms_mirror_left_all /= num_points_left;    // all rays from left mirror to calib plane
   rms_non_rp_sum /= num_points_all;          // all points to calib plane (front + mirrors)
-  //   rms_plane_sum = (rms_plane_sum / (transformed_cloud.size() * transformed_cloud[0].points.size()));
   rms_rm_reflectionpoint /=
     right_mirror_refl_points.size();  // all rays known to hit reflector from right mirror
   rms_lm_reflectionpoint /=
@@ -2214,15 +2090,18 @@ double LidarMirrorFOVReshaperCalib::errFnMirrorFix(
 
     if (opt_params.opt_result->verbose_output == 2) {
       RCLCPP_INFO(
-        rclcpp::get_logger("OSG_TF"),
-        "rms_all: %f(m),"
-        "rms_non_rp_sum: %f(m),"
-        "rms_rm_reflectionpoints: %f(m),"
-        "rms_lm_reflectionpoints: %f(m),"
-        "rms_mirror_right_all: %f(m),"
-        "rms_mirror_left_all: %f(m)",
-        "rms_front: %f(m)", rms_all, rms_non_rp_sum, rms_rm_reflectionpoint, rms_lm_reflectionpoint,
-        rms_mirror_right_all, rms_mirror_left_all, rms_front);
+        rclcpp::get_logger("lidar_mirror_fov_reshaper_calibration"),
+        "Current calibration result:\n"
+        "rms_all                : %10.6f (mm)\n"
+        "rms_non_rp_sum         : %10.6f (mm)\n"
+        "rms_rm_reflectionpoints: %10.6f (mm)\n"
+        "rms_lm_reflectionpoints: %10.6f (mm)\n"
+        "rms_mirror_right_all   : %10.6f (mm)\n"
+        "rms_mirror_left_all    : %10.6f (mm)\n"
+        "rms_front              : %10.6f (mm)\n",
+        1e3 * rms_all, 1e3 * rms_non_rp_sum, 1e3 * rms_rm_reflectionpoint,
+        1e3 * rms_lm_reflectionpoint, 1e3 * rms_mirror_right_all, 1e3 * rms_mirror_left_all,
+        1e3 * rms_front);
     }
   } else if (opt_params.opt_result->verbose_output == 3) {
     opt_params.opt_result->rms_all = rms_all;
@@ -2278,23 +2157,25 @@ void LidarMirrorFOVReshaperCalib::initOptimization(
     this->optimizeNonVerbose(
       opt_params, plane_support_vec, plane_normal_vec, mirror_right_support_vec,
       mirror_right_normal_vec, mirror_left_support_vec, mirror_left_normal_vec, no_opt_params,
-      epsabs, stepsize, iter_max, false);
+      epsabs, stepsize, iter_max);
 
   RCLCPP_INFO(
-    rclcpp::get_logger("OSG_TF"),
-    "\nrms_all (mm): %f\n"
-    "rms_non_rp_all (mm): %f\n"
-    "rms_rm_reflectionpoint (mm): %f\n"
-    "rms_lm_reflectionpoint (mm): %f\n"
-    "rms_plane_rm (mm): %f\n"
-    "rms_plane_lm (mm): %f\n",
-    "rms_front (mm): %f\n", this->roundTo4Decimals(opt_params.opt_result->rms_all),
-    this->roundTo4Decimals(opt_params.opt_result->rms_non_rp_all),
-    this->roundTo4Decimals(opt_params.opt_result->rms_rm_reflectionpoint),
-    this->roundTo4Decimals(opt_params.opt_result->rms_lm_reflectionpoint),
-    this->roundTo4Decimals(opt_params.opt_result->rms_plane_rm),
-    this->roundTo4Decimals(opt_params.opt_result->rms_plane_lm),
-    this->roundTo4Decimals(opt_params.opt_result->rms_front));
+    this->get_logger(),
+    "Calibration summary:\n"
+    "rms_all               : %10.3f (mm)\n"
+    "rms_non_rp_all        : %10.3f (mm)\n"
+    "rms_rm_reflectionpoint: %10.3f (mm)\n"
+    "rms_lm_reflectionpoint: %10.3f (mm)\n"
+    "rms_plane_rm          : %10.3f (mm)\n"
+    "rms_plane_lm          : %10.3f (mm)\n"
+    "rms_front             : %10.3f (mm)\n",
+    this->roundToNDecimals(opt_params.opt_result->rms_all),
+    this->roundToNDecimals(opt_params.opt_result->rms_non_rp_all),
+    this->roundToNDecimals(opt_params.opt_result->rms_rm_reflectionpoint),
+    this->roundToNDecimals(opt_params.opt_result->rms_lm_reflectionpoint),
+    this->roundToNDecimals(opt_params.opt_result->rms_plane_rm),
+    this->roundToNDecimals(opt_params.opt_result->rms_plane_lm),
+    this->roundToNDecimals(opt_params.opt_result->rms_front));
 
   return;
 };
@@ -2334,14 +2215,12 @@ bool LidarMirrorFOVReshaperCalib::optimizeMirrorOrientations()
   int opt_status = opt_params.opt_result->optimization_status;
 
   this->printOptimizationResults(true, true);
-
-  // cleanup
   delete opt_constraints;
 
-  // Visualize normal vectors
-  if (this->viz_normal_vectors) this->visualizeNormalVectors(*opt_result);
+  if (this->viz_normal_vectors_) this->visualizeNormalVectors(*opt_result);
   this->optimization_results_ = *opt_result;
   delete opt_result;
+
   // Transform raw pointclouds with optimized parameters
   pcl::PointCloud<pcl::PointXYZI> transformed_cloud_combined, transformed_cloud_rm,
     transformed_cloud_lm;
@@ -2353,8 +2232,8 @@ bool LidarMirrorFOVReshaperCalib::optimizeMirrorOrientations()
 
   // Visualize optimized planes (mirrors and optimization/calibration plane)
   if (
-    this->viz_optimized_planes_all || this->viz_optimized_plane_lm ||
-    this->viz_optimized_plane_rm) {
+    this->viz_optimized_planes_all_ || this->viz_optimized_plane_lm_ ||
+    this->viz_optimized_plane_rm_) {
     visualization_msgs::msg::MarkerArray::SharedPtr optimized_planes_viz(
       new visualization_msgs::msg::MarkerArray);
     this->visualizeOptimizedPlanes(optimized_planes_viz);
@@ -2362,8 +2241,8 @@ bool LidarMirrorFOVReshaperCalib::optimizeMirrorOrientations()
 
   // Visualize transformed pointclouds
   if (
-    this->viz_transformed_cloud_all || this->viz_transformed_cloud_lm ||
-    this->viz_transformed_cloud_rm)
+    this->viz_transformed_cloud_all_ || this->viz_transformed_cloud_lm_ ||
+    this->viz_transformed_cloud_rm_)
     this->visualizeTransformedPointclouds(
       transformed_cloud_combined, transformed_cloud_rm, transformed_cloud_lm);
 
@@ -2379,13 +2258,12 @@ bool LidarMirrorFOVReshaperCalib::optimizeMirrorOrientations()
       plane_normal_vec_rpy[0], plane_normal_vec_rpy[1], plane_normal_vec_rpy[2]);
     std::vector<double> position_marker = {
       this->plane_support_vec_[0], this->plane_support_vec_[1], this->plane_support_vec_[2]};
-    std::vector<double> rgba_marker = {0.5, 0.0, 0.3, 0.7};
-    std::vector<double> dimensions_calib_plane = {0.04, 1.25, 4.0};
+    std::vector<double> rgba_marker = {0.5, 0.0, 0.8, 0.7};
     this->initPlaneMarker(
-      position_marker, plane_normal_vec_quat, 99, dimensions_calib_plane, cube_marker,
+      position_marker, plane_normal_vec_quat, 99, this->viz_calib_plane_dim_, cube_marker,
       this->laser_scanner_frame_id_.c_str(), rgba_marker);
 
-    this->cube_marker_pub_->publish(*cube_marker);
+    this->calib_plane_box_pub_->publish(*cube_marker);
   };
 
   return opt_status > 0 ? true : false;
@@ -2395,16 +2273,15 @@ void LidarMirrorFOVReshaperCalib::exportOptimizationHistory(
   const optimization_history & opt_hist, const std::string & filename,
   const std::string & optimization_method)
 {
-  RCLCPP_INFO(this->get_logger(), "Exporting optimization history...");
+  RCLCPP_INFO(this->get_logger(), "History written to file: %s", filename.c_str());
   std::string file_path =
-    ament_index_cpp::get_package_share_directory("lidar_mirror_fov_reshaper_calibration") +
-    "/results/" + filename;
+    ament_index_cpp::get_package_share_directory(this->get_name()) + "/results/" + filename;
 
   std::ofstream history_file;
   bool file_exists = std::ifstream(file_path).good();
   history_file.open(file_path, std::ios::app);
 
-  if (!file_exists) {
+  if (!file_exists || history_file.tellp() == 0) {
     RCLCPP_INFO(this->get_logger(), "Creating history file: %s", file_path.c_str());
     history_file << "optimization_method,pitch_left_mirror [deg],yaw_left_mirror "
                     "[deg],pitch_right_mirror [deg],yaw_right_mirror [deg],err_"
@@ -2413,7 +2290,7 @@ void LidarMirrorFOVReshaperCalib::exportOptimizationHistory(
                     "[mm],err_reflection_point_rm [mm],err_all [mm]\n";
   }
 
-  if (this->getCSVrowcount(file_path) > 2) history_file << "\n";
+  if (this->getCSVrowcount(file_path) > 1) history_file << "\n";
 
   for (size_t i = 0; i < opt_hist.pitch_left_mirror.size(); i++) {
     history_file << optimization_method;
@@ -2447,7 +2324,6 @@ void LidarMirrorFOVReshaperCalib::visualizeNormalVectors(optimization_result & o
   visualization_msgs::msg::MarkerArray::SharedPtr normal_vector_viz(
     new visualization_msgs::msg::MarkerArray);
 
-  // calc orientation of normal vectors in order to visualize them
   std::vector<double> mirror_right_normal_vec_rpy =
     lidarMirrorFOVReshaperTF::calcRPY(this->mirror_right_normal_vec_);
 
@@ -2471,9 +2347,11 @@ void LidarMirrorFOVReshaperCalib::visualizeNormalVectors(optimization_result & o
 
   int viz_plane_id = 0;
 
+  // normal vector of right mirror (calibrated)
+  double marker_scale = 0.01;
   this->initVectorVisualizer(
-    marker_normal_vec_r, this->laser_scanner_frame_id_.c_str(), this->ros_ns.c_str(), viz_plane_id,
-    marker_normal_vec_r_rgba);
+    marker_normal_vec_r, this->laser_scanner_frame_id_.c_str(), viz_plane_id,
+    marker_normal_vec_r_rgba, marker_scale);
 
   geometry_msgs::msg::Point p;
 
@@ -2493,9 +2371,10 @@ void LidarMirrorFOVReshaperCalib::visualizeNormalVectors(optimization_result & o
   std::vector<double> marker_normal_vec_l_rgba = {0.0, 1.0, 0.0, 1.0};
 
   viz_plane_id++;
+  // normal vector of left mirror (calibrated)
   this->initVectorVisualizer(
-    marker_normal_vec_l, this->laser_scanner_frame_id_.c_str(), this->ros_ns.c_str(), viz_plane_id,
-    marker_normal_vec_l_rgba);
+    marker_normal_vec_l, this->laser_scanner_frame_id_.c_str(), viz_plane_id,
+    marker_normal_vec_l_rgba, marker_scale);
 
   p.x = this->mirror_left_support_vec_[0];
   p.y = this->mirror_left_support_vec_[1];
@@ -2512,9 +2391,10 @@ void LidarMirrorFOVReshaperCalib::visualizeNormalVectors(optimization_result & o
   std::vector<double> marker_normal_vec_plane_rgba = {1.0, 0.0, 0.0, 1.0};
 
   viz_plane_id++;
+  // normal vector of calibration plane
   this->initVectorVisualizer(
-    marker_normal_vec_plane, this->laser_scanner_frame_id_.c_str(), this->ros_ns.c_str(),
-    viz_plane_id, marker_normal_vec_plane_rgba);
+    marker_normal_vec_plane, this->laser_scanner_frame_id_.c_str(), viz_plane_id,
+    marker_normal_vec_plane_rgba, marker_scale);
   p.x = this->plane_support_vec_[0];
   p.y = this->plane_support_vec_[1];
   p.z = this->plane_support_vec_[2];
@@ -2525,7 +2405,7 @@ void LidarMirrorFOVReshaperCalib::visualizeNormalVectors(optimization_result & o
   marker_normal_vec_plane->points.push_back(p);
   normal_vector_viz->markers.push_back(*marker_normal_vec_plane);
 
-  if (this->viz_normal_vectors) this->normal_vectors_pub_->publish(*normal_vector_viz);
+  if (this->viz_normal_vectors_) this->normal_vectors_pub_->publish(*normal_vector_viz);
 };
 
 void LidarMirrorFOVReshaperCalib::visualizeTransformedPointclouds(
@@ -2548,7 +2428,7 @@ void LidarMirrorFOVReshaperCalib::visualizeTransformedPointclouds(
     return;
   }
 
-  if (this->viz_transformed_cloud_all) {
+  if (this->viz_transformed_cloud_all_) {
     sensor_msgs::msg::PointCloud2 transformed_cloud_combined_msg;
     pcl::toROSMsg(transformed_cloud_all, transformed_cloud_combined_msg);
     transformed_cloud_combined_msg.header.frame_id = this->laser_scanner_frame_id_;
@@ -2560,7 +2440,7 @@ void LidarMirrorFOVReshaperCalib::visualizeTransformedPointclouds(
     this->transformed_cloud_all_pub_->publish(transformed_cloud_combined_msg);
   }
 
-  if (this->viz_transformed_cloud_lm) {
+  if (this->viz_transformed_cloud_lm_) {
     sensor_msgs::msg::PointCloud2 transformed_cloud_lm_msg;
     pcl::toROSMsg(transformed_cloud_lm, transformed_cloud_lm_msg);
     transformed_cloud_lm_msg.header.frame_id = this->laser_scanner_frame_id_;
@@ -2573,7 +2453,7 @@ void LidarMirrorFOVReshaperCalib::visualizeTransformedPointclouds(
     this->transformed_cloud_lm_pub_->publish(transformed_cloud_lm_msg);
   }
 
-  if (this->viz_transformed_cloud_rm) {
+  if (this->viz_transformed_cloud_rm_) {
     sensor_msgs::msg::PointCloud2 transformed_cloud_rm_msg;
     pcl::toROSMsg(transformed_cloud_rm, transformed_cloud_rm_msg);
     transformed_cloud_rm_msg.header.frame_id = this->laser_scanner_frame_id_;
@@ -2615,32 +2495,33 @@ void LidarMirrorFOVReshaperCalib::visualizeOptimizedPlanes(
     this->optimization_results_.roll_left_mirror, this->optimization_results_.pitch_left_mirror,
     this->optimization_results_.yaw_left_mirror);
 
-  // draw planes
-  std::vector<double> dimensions_mirrors = {0.005, 0.06, 0.04};  // [m]
-  std::vector<double> dimensions_calib_plane = {0.0025, 0.75, 4.0};
+  // viz calibration plane + mirrors
+  int marker_id = 0;
   this->initPlaneMarker(
-    this->plane_support_vec_, plane_normal_vec_quat, 0, dimensions_calib_plane,
+    this->plane_support_vec_, plane_normal_vec_quat, marker_id, this->viz_calib_plane_dim_,
     marker_opt_plane_mesh, this->laser_scanner_frame_id_.c_str(), opt_plane_rgba);
   optimized_planes_viz->markers.push_back(*marker_opt_plane_mesh);
 
   this->initPlaneMarker(
-    this->mirror_left_support_vec_, mirror_left_normal_vec_quat, 1, dimensions_mirrors,
-    marker_opt_lm_plane_mesh, this->laser_scanner_frame_id_.c_str(), lm_rgba);
+    this->mirror_left_support_vec_, mirror_left_normal_vec_quat, marker_id + 1,
+    this->viz_mirror_planes_dim_, marker_opt_lm_plane_mesh, this->laser_scanner_frame_id_.c_str(),
+    lm_rgba);
   optimized_planes_viz->markers.push_back(*marker_opt_lm_plane_mesh);
 
   this->initPlaneMarker(
-    this->mirror_right_support_vec_, mirror_right_normal_vec_quat, 2, dimensions_mirrors,
-    marker_opt_rm_plane_mesh, this->laser_scanner_frame_id_.c_str(), rm_rgba);
+    this->mirror_right_support_vec_, mirror_right_normal_vec_quat, marker_id + 2,
+    this->viz_mirror_planes_dim_, marker_opt_rm_plane_mesh, this->laser_scanner_frame_id_.c_str(),
+    rm_rgba);
   optimized_planes_viz->markers.push_back(*marker_opt_rm_plane_mesh);
 
-  if (this->viz_optimized_planes_all)
+  if (this->viz_optimized_planes_all_)
     this->optimized_planes_pub_->publish(*optimized_planes_viz);
   else {
-    if (this->viz_optimized_plane_opt_plane)
+    if (this->viz_optimized_plane_opt_plane_)
       this->optimized_plane_opt_plane_pub_->publish(optimized_planes_viz->markers[0]);
-    if (this->viz_optimized_plane_lm)
+    if (this->viz_optimized_plane_lm_)
       this->optimized_plane_lm_pub_->publish(optimized_planes_viz->markers[1]);
-    if (this->viz_optimized_plane_rm)
+    if (this->viz_optimized_plane_rm_)
       this->optimized_plane_rm_pub_->publish(optimized_planes_viz->markers[2]);
   }
 };
@@ -2653,6 +2534,7 @@ void LidarMirrorFOVReshaperCalib::initPlaneMarker(
   marker->header.frame_id = src_frame_id;
   marker->header.stamp = rclcpp::Time(0);
   marker->id = id;
+  marker->ns = "lmfr";
   marker->type = visualization_msgs::msg::Marker::CUBE;
   marker->action = visualization_msgs::msg::Marker::ADD;
   marker->pose.position.x = position[0];
@@ -2671,38 +2553,39 @@ void LidarMirrorFOVReshaperCalib::initPlaneMarker(
   marker->color.a = rgba[3];
 };
 
-double LidarMirrorFOVReshaperCalib::roundTo4Decimals(double value)
+double LidarMirrorFOVReshaperCalib::roundToNDecimals(double value, int n /* = 4 */)
 {
-  double precision = 1e-5;
+  double precision = std::pow(10, n);
+  precision = 1.0 / precision;
   double rounded_val = std::round(value / precision) * precision;
   return (rounded_val * 1000);  // convert to mm
 };
 
 void LidarMirrorFOVReshaperCalib::initVectorVisualizer(
-  visualization_msgs::msg::Marker::SharedPtr marker, const char * src_frame_id, const char * ns,
-  int id, std::vector<double> & rgba)
+  visualization_msgs::msg::Marker::SharedPtr marker, const char * src_frame_id, int id,
+  std::vector<double> & rgba, double scale /* = 0.001 */)
 {
   marker->header.frame_id = src_frame_id;
   marker->header.stamp = rclcpp::Time(0);
-  marker->ns = ns;
   marker->id = id;
   marker->type = visualization_msgs::msg::Marker::ARROW;
   marker->action = visualization_msgs::msg::Marker::ADD;
-  marker->scale.x = 0.01;
-  marker->scale.y = 0.01;
-  marker->scale.z = 0.01;
+  marker->scale.x = scale;
+  marker->scale.y = scale;
+  marker->scale.z = scale;
   marker->color.r = rgba[0];
   marker->color.g = rgba[1];
   marker->color.b = rgba[2];
   marker->color.a = rgba[3];
 };
 
-std::vector<double> crossProduct(std::vector<double> & a, std::vector<double> & b)
+std::vector<double> LidarMirrorFOVReshaperCalib::crossProduct(
+  std::vector<double> & a, std::vector<double> & b)
 {
   if (a.size() != 3 || b.size() != 3) {
     RCLCPP_ERROR(
-      rclcpp::get_logger("OSG_TF"), "Input vectors must be of dim 3\nAre of dim: a: %ld, b: %ld",
-      a.size(), b.size());
+      this->get_logger(), "Input vectors must be of dim 3\nAre of dim: a: %ld, b: %ld", a.size(),
+      b.size());
     return {};
   }
 
@@ -2715,17 +2598,22 @@ std::vector<double> crossProduct(std::vector<double> & a, std::vector<double> & 
 
 double LidarMirrorFOVReshaperCalib::rad2deg(const double & rad) { return ((rad * 180) / M_PI); };
 
-double LidarMirrorFOVReshaperCalib::deg2rad(const double & deg) { return ((deg * M_PI) / 180); };
-
 bool LidarMirrorFOVReshaperCalib::optimizeMirrorSupportVectors(
   int tgt_angle_lm /*=-1*/, int tgt_angle_rm /*=-1*/)
 {
-  int tgt_idx_lm = lidarMirrorFOVReshaperTF::angle2ArrIdx(
-    tgt_angle_lm, this->laser_scanner_angle_min_, this->laser_scanner_angle_max_,
-    this->mirror_left_start_angle_, this->mirror_left_end_angle_);
-  int tgt_idx_rm = lidarMirrorFOVReshaperTF::angle2ArrIdx(
-    tgt_angle_rm, this->laser_scanner_angle_min_, this->laser_scanner_angle_max_,
-    this->mirror_right_start_angle_, this->mirror_right_end_angle_);
+  int tgt_idx_lm = -1;
+  int tgt_idx_rm = -1;
+  if (tgt_angle_lm >= 0) {
+    tgt_idx_lm = lidarMirrorFOVReshaperTF::angle2ArrIdx(
+      tgt_angle_lm, this->laser_scanner_angle_min_, this->laser_scanner_angle_max_,
+      this->mirror_left_start_angle_, this->mirror_left_end_angle_);
+  }
+
+  if (tgt_angle_rm >= 0) {
+    tgt_idx_rm = lidarMirrorFOVReshaperTF::angle2ArrIdx(
+      tgt_angle_rm, this->laser_scanner_angle_min_, this->laser_scanner_angle_max_,
+      this->mirror_right_start_angle_, this->mirror_right_end_angle_);
+  }
 
   if (tgt_idx_lm < 0) tgt_idx_lm = this->pointcloud_buffer_left_mirror_.at(0).points.size() / 2;
 
@@ -2753,11 +2641,18 @@ bool LidarMirrorFOVReshaperCalib::optimizeMirrorSupportVectors(
   avg_rm_sv[2] /= this->pointcloud_buffer_right_mirror_.size();
 
   RCLCPP_INFO(
+    this->get_logger(), "Support vector, used reference index for left mirror: %d", tgt_idx_lm);
+  RCLCPP_INFO(
+    this->get_logger(), "Support vector, used reference index for right mirror: %d", tgt_idx_rm);
+
+  RCLCPP_INFO(
     this->get_logger(), "Avg. left mirror support vector: [%f, %f, %f]", avg_lm_sv[0], avg_lm_sv[1],
     avg_lm_sv[2]);
   RCLCPP_INFO(
     this->get_logger(), "Avg. right mirror support vector: [%f, %f, %f]", avg_rm_sv[0],
     avg_rm_sv[1], avg_rm_sv[2]);
+
+  return true;
 };
 
 int main(int argc, char ** argv)

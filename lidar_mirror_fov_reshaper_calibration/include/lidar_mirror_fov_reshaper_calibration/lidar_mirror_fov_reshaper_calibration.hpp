@@ -37,6 +37,7 @@ limitations under the License.
 #include <functional>
 #include <iomanip>  // std::fixed; std::setprecision
 #include <iostream>
+#include <laser_geometry/laser_geometry.hpp>
 #include <map>
 #include <numeric>
 #include <rclcpp/rclcpp.hpp>
@@ -158,12 +159,27 @@ private:
  */
   static double errFnMirrorFix(unsigned n, const double * x, double * grad, void * function_params);
 
+  /**
+   * @brief @todo
+   * 
+   * @param opt_params
+   * @param plane_support_vec
+   * @param plane_normal_vec
+   * @param mirror_right_support_vec
+   * @param mirror_right_normal_vec
+   * @param mirror_left_support_vec
+   * @param mirror_left_normal_vec
+   * @param no_opt_params
+   * @param epsabs
+   * @param stepsize
+   * @param iter_max
+   */
   void optimizeNonVerbose(
     optimization_params & opt_params, std::vector<double> & plane_support_vec,
     std::vector<double> & plane_normal_vec, std::vector<double> & mirror_right_support_vec,
     std::vector<double> & mirror_right_normal_vec, std::vector<double> & mirror_left_support_vec,
     std::vector<double> & mirror_left_normal_vec, const int & no_opt_params, const double & epsabs,
-    const double & stepsize, const size_t & iter_max, bool plot_error /*= false*/);
+    const double & stepsize, const size_t & iter_max);
 
   /**
    * @brief Optimizes a given function using the GSL library
@@ -242,7 +258,7 @@ private:
   void scanCallback(const sensor_msgs::msg::LaserScan::SharedPtr msg);
 
   /**
-   * @brief Init Optimizationprocess. Utilizes the OSG_TF library functionality
+   * @brief Init Optimizationprocess. Utilizes the LMFR_TF library functionality
    */
   void optimize();
 
@@ -255,6 +271,10 @@ private:
   /** 
    * @brief Optimize the support vectors of the mirrors
    *          x-y planar distance between lidar and mirror
+   * 
+   * @param[in] tgt_angle_lm Target angle for left mirror
+   * @param[in] tgt_angle_rm Target angle for right mirror
+   * @return bool
    */
   bool optimizeMirrorSupportVectors(int tgt_angle_lm = -1, int tgt_angle_rm = -1);
 
@@ -379,58 +399,6 @@ private:
    * @return double 
    */
   double rad2deg(const double & rad);
-
-  /**
-   * @brief Convert degrees to radians
-   * 
-   * @param[in] deg angle in degrees 
-   * @return (double) angle in radians
-   */
-  double deg2rad(const double & deg);
-
-  /**
-   * @brief Identify the mirror points based on the given distance
-   * 
-   * @param[in] src_cloud Pointcloud to identify the mirror points
-   * @param[in] mirror 0: left mirror, 1: right mirror
-   * @param[in] mode 
-   */
-  void identifyMirrorPoints(
-    const pcl::PointCloud<pcl::PointXYZI> & src_cloud, int mirror = 0, int mode = 0);
-
-  /**
- * @brief Identifies mirror points based on the slope of the point cloud data.
- * 
- * This function processes the provided point cloud (`src_cloud`) and identifies potential mirror points by evaluating the slope within a sliding window across the cloud. The function calculates the slope at each point in the cloud, then determines the threshold for identifying jumps or significant changes in slope, which indicate the presence of mirror points. The threshold is based on the 95th percentile of slopes in the cloud.
- * 
- * The function modifies the internal mirror start and end angles for both the left and right mirrors, based on identified jumps in the slope.
- * 
- * @param[in] src_cloud The input point cloud containing the data to be processed.
- * @param[in] inital_guess_min The minimum value used to filter the point cloud for initial guess.
- * @param[in] inital_guess_max The maximum value used to filter the point cloud for initial guess.
- * @param[out] min_max_indices The indices of the points in the cloud corresponding to the initial guess range (not used directly in the function, but indicated as an output).
- * @param[in] sliding_window_size The size of the sliding window used to evaluate the slope in the given window range. Default value is 1. A value greater than 0 means that the elements +- `sliding_window_size` will be considered.
- */
-  void identifyMirrorPointsSlope(
-    const pcl::PointCloud<pcl::PointXYZI> & src_cloud, double inital_guess_min,
-    double inital_guess_max, int sliding_window_size = 1);
-
-  /**
- * @brief Identifies mirror points based on the mean distance (range) and standard deviation.
- * 
- * This function processes the provided point cloud (`src_cloud`) and identifies mirror points by evaluating the mean and standard deviation of the distance (range) of points from the origin. It filters the points by checking if their distance falls within one standard deviation from the mean range. The function then calculates the new minimum and maximum indices for the mirror points based on this filtering process.
- * 
- * The `apply_sigma` parameter controls whether or not to apply the sigma (standard deviation) filtering.
- * 
- * @param[in] src_cloud The input point cloud containing the data to be processed.
- * @param[in] inital_guess_min The minimum value used to filter the point cloud for initial guess.
- * @param[in] inital_guess_max The maximum value used to filter the point cloud for initial guess.
- * @param[out] min_max_indices The output indices representing the range of mirror points.
- * @param[in] apply_sigma A flag to control whether to apply sigma (standard deviation) filtering. Default is false.
- */
-  void identifyMirrorPointsMeanDist(
-    const pcl::PointCloud<pcl::PointXYZI> & src_cloud, double inital_guess_min,
-    double inital_guess_max, pcl::PointIndices * min_max_indices, bool apply_sigma = false);
 
   /**
    * @brief Initialize the optimization parameters according to the used parameters during during the lidar_mirror_reshaper calibration
@@ -613,12 +581,11 @@ private:
  */
   std::vector<double> crossProduct(std::vector<double> & a, std::vector<double> & b);
 
-  int applyMirrorBoundary(
-    bool mirror_left, int idx_highest_intensity, size_t cloud_size);
+  int applyMirrorBoundary(bool mirror_left, int idx_highest_intensity, size_t cloud_size);
 
-  
-    void applyInterpolation(
-      bool mirror_left, int idx_highest_intensity, pcl::PointCloud<pcl::PointXYZI> & cloud, double max_intensity);
+  void applyInterpolation(
+    bool mirror_left, int idx_highest_intensity, pcl::PointCloud<pcl::PointXYZI> & cloud,
+    double max_intensity);
 
   // Subscriber
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr input_cloud_sub_;
@@ -664,7 +631,6 @@ private:
   double optimization_epsabs_;
   double optimization_stepsize_;
   int optimization_iter_max_;
-  bool optimization_adaptive_stepsize_;
 
   bool write_optimized_params_;
   bool write_optimization_history_;
@@ -678,8 +644,6 @@ private:
   double front_end_angle_;
 
   int mirror_safety_bufferzone_size_lm_;
-  bool auto_define_lm_start_angle_;
-  bool auto_define_lm_end_angle_;
   int auto_define_lm_angle_mode_;
   double mirror_left_start_angle_;
   double mirror_left_end_angle_;
@@ -690,8 +654,6 @@ private:
   std::vector<double> mirror_left_support_vec_;
 
   int mirror_safety_bufferzone_size_rm_;
-  bool auto_define_rm_start_angle_;
-  bool auto_define_rm_end_angle_;
   int auto_define_rm_angle_mode_;
   double mirror_right_start_angle_;
   double mirror_right_end_angle_;
@@ -756,12 +718,12 @@ private:
   std::vector<pcl::PointCloud<pcl::PointXYZI>> transformed_pointcloud_buffer_left_mirror_;
   std::vector<pcl::PointCloud<pcl::PointXYZI>> transformed_pointcloud_buffer_right_mirror_;
 
-  // temporary @todo fix this
+  laser_geometry::LaserProjection projector_;
+
   std::vector<pcl::PointCloud<pcl::PointXYZI>> raw_pointcloud_buffer_;
   std::vector<pcl::PointCloud<pcl::PointXYZI>> raw_pointcloud_buffer_front_;
   std::vector<pcl::PointCloud<pcl::PointXYZI>> raw_pointcloud_buffer_left_mirror_;
   std::vector<pcl::PointCloud<pcl::PointXYZI>> raw_pointcloud_buffer_right_mirror_;
-  // -----------------------------
 
   double intensity_threshold_percentage_;
   int interpolation_window;

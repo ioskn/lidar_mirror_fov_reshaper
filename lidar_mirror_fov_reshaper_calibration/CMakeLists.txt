@@ -17,7 +17,9 @@ find_package(pcl_ros REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2 REQUIRED)
+find_package(laser_geometry REQUIRED)
 find_package(NLopt REQUIRED)
+
 
 find_package(lidar_mirror_fov_reshaper_transformation REQUIRED)
 
@@ -28,6 +30,7 @@ set(dependencies
     pcl_ros
     tf2_ros
     tf2
+    laser_geometry  
     lidar_mirror_fov_reshaper_transformation
 )
 add_executable(${PROJECT_NAME} src/${PROJECT_NAME}.cpp)

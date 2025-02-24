@@ -1,10 +1,10 @@
 /lidar_mirror_fov_reshaper_calibration: # for any further parameter description, please checkout/build the documentation
   ros__parameters:
     laser_scanner:
-      topic: "cloud"
+      topic: "/sick_tim_5xx/scan"
       frame_id: "cloud"
-      angle_min: -135 # deg, int
-      angle_max: 135 # deg, int
+      angle_min: -2.35619 # [rad],float
+      angle_max: 2.35619 # [rad],float
       use_pointcloud_input: false # if false, laserscan input is being used
 
     visualization:
@@ -21,20 +21,19 @@
 
     optimization:
       filter_method: 0
-      filter_dist_threshold: 0.1
+      filter_dist_threshold: 0.3
       interpolation_window: 0 
       averaging_n_clouds: -1 
       intensity_threshold_percentage: 0.1
       buffer_size: 3500
       epsabs: 1e-4
       stepsize: 1e-3
-      iter_max: 1e3
-      adaptive_stepsize: false
+      iter_max: 1500
       opt_mirror_orientation: true
       opt_mirror_support_vec: false
-      write_optimized_params: false
-      write_optimization_history: false
-      optimization_history_file_: "lmfrc_history.csv"
+      write_optimized_params: true
+      write_optimization_history: true
+      optimization_history_file: "lmfrc_history.csv"
       optimized_params_meta_file: "lmfrc_metadata.csv"
       optimized_params_file: "lmfrc_results.csv"
       optimized_params_out_dir: "/my_out_dir/"
@@ -75,37 +74,37 @@
             z: true
 
     calibration_plane:
-      support_vec: [0.15, 0.0, -0.35]
-      helper_p1: [0.15, 0.35, 0.0]
-      helper_p2: [0.15, -0.2, 0.0]
-      helper_p3: [0.15, 0.0, 0.1]
+      support_vec: [0.64, 0.02, -1.19]
+      helper_p1: [0.64, 0.19, 0.0]
+      helper_p2: [0.64, -0.30, 0.0]
+      helper_p3: [0.64, 0.0, -0.8]  
 
     mirror_front:
-      start_angle: -45
-      end_angle: 45
+      start_angle: -45.0 # [deg],float
+      end_angle: 45.0 # [deg],float
 
     mirror_left:
-      mirror_safety_bufferzone_size: 5
-      auto_define_start_angle: false
-      auto_define_end_angle: false
+      mirror_safety_bufferzone_size: 0
       auto_define_angle_mode: 0
-      start_angle: 97
-      end_angle: 128
-      helper_p1: [-0.018, 0.057, -0.01846]
-      helper_p2: [-0.042, 0.045, 0.01846]
-      helper_p3: [-0.015, 0.057, 0.01475]
+      start_angle: 90.0 # [deg],float
+      end_angle: 135.0 # [deg],float
+      helper_p1: [-0.0051, 0.0688, 0.0112]
+      helper_p2: [0.0117, 0.119, -0.0149]
+      helper_p3: [0.0191,0.0989, 0.0143] 
       support_vec: [0.0, 0.094, 0.0]
       normal_vec: [0.45, -0.33, -0.403583]
+      auto_calc_normal_vec: false
 
     mirror_right:
-      mirror_safety_bufferzone_size: 4
+      mirror_safety_bufferzone_size: 0
       auto_define_start_angle: false
       auto_define_end_angle: false
       auto_define_angle_mode: 0 
-      start_angle: -131
-      end_angle: -97
-      helper_p1: [-0.018, -0.057, -0.01846]
-      helper_p2: [-0.042, -0.045, 0.01846]
-      helper_p3: [-0.015, -0.057, 0.01475]
+      start_angle: -135.0 # [deg],float
+      end_angle: -90.0 # [deg],float
+      helper_p1: [-0.0051, -0.0688, 0.0112]
+      helper_p2: [0.0117, -0.119, -0.0149]
+      helper_p3: [0.0191,-0.0989, 0.0143] 
       support_vec: [0.0, -0.095, 0.0]
       normal_vec: [0.4, 0.29, -0.33]
+      auto_calc_normal_vec: false

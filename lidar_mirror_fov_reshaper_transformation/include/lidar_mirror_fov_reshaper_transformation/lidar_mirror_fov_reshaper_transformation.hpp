@@ -14,8 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// The following function descriptions contain latex style equations that are only rendered in the html generated documentation.
+
 #ifndef LIDAR_MIRROR_FOV_RESHAPER_TF_HPP
 #define LIDAR_MIRROR_FOV_RESHAPER_TF_HPP
+
+#include <pcl/PointIndices.h>
+#include <pcl/point_cloud.h>
+#include <pcl/point_types.h>
 
 #include <algorithm>
 #include <chrono>
@@ -23,15 +29,10 @@ limitations under the License.
 #include <functional>
 #include <memory>
 #include <numeric>
-#include <type_traits>
-#include <vector>
-
-#include <pcl/PointIndices.h>
-#include <pcl/point_cloud.h>
-#include <pcl/point_types.h>
-
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
+#include <type_traits>
+#include <vector>
 
 namespace lidarMirrorFOVReshaperTF
 {
@@ -242,10 +243,9 @@ void getTransformedVectors(
  * @param[in] mag_distance_vec The magnitude of the distance vector.
  * @return std::vector<double> The computed vector leading to the transformed data point.
  */
-std::vector<double> _getVectorToTransformedDataPoint(
+std::vector<double> getVectorToTransformedDataPoint(
   const std::vector<double> & unit_reflection_vec, double mag_reflection_vec,
   double mag_distance_vec);
-
 
 /**
  * @brief Compute vectors leading to transformed data points from reflection points.
@@ -290,7 +290,6 @@ void getVectorsToTransformedDataPoints(
 void transformVectorIntoPointCloud(
   const std::vector<std::vector<double>> & distance_vectors,
   pcl::PointCloud<pcl::PointXYZI> * target_cloud);
-
 
 /**
    * @brief Calculates the reflection points on the mirror plane of each
@@ -385,7 +384,6 @@ void getMirrorReflectionPoints(
   const std::vector<pcl::PointCloud<pcl::PointXYZI>> & pointcloud_buffer,
   std::vector<int> & indices, std::vector<pcl::PointXYZI> & reflection_points);
 
-
 /**
    * @brief Calculate the standard deviation of a given vector
    *
@@ -411,7 +409,6 @@ void getPointcloudIndices(
   const pcl::PointCloud<pcl::PointXYZI> & pcl_msg, double start_angle, double end_angle,
   pcl::PointIndices * indices);
 
-
 /**
  * @brief Calculate the Roll, Pitch, and Yaw (RPY) angles from the given normal vector.
  *
@@ -426,7 +423,6 @@ void getPointcloudIndices(
  * - yaw is the angle of the projection of the normal vector onto the x-y plane.
  */
 std::vector<double> calcRPY(std::vector<double> normal_vec);
-
 
 /**
    * @brief Convert degrees to radians
@@ -456,6 +452,22 @@ int angle2ArrIdx(
   double tgt_angle, double angle_min, double angle_max, double tgt_area_angle_min,
   double tgt_area_angle_max, double angle_increment = 1);
 
+/**
+ * @brief unwrap/unpack given vector containing all components defining the calibration space of lidar_mirror_fov_calibration
+ * 
+ * @param[in] src_vec 6x3 dim vector containing all components defining the calibration space of lidar_mirror_fov_calibration
+ * @param[out] plane_support_vec support vector of the calibration plane
+ * @param[out] plane_normal_vec normal vector of the calibration plane
+ * @param[out] mirror_right_support_vec support vector defining the position of the right mirror
+ * @param[out] mirror_right_normal_vec normal vector of the right mirror, defining its orientation
+ * @param[out] mirror_left_support_vec support vector defining the position of the left mirror
+ * @param[out] mirror_left_normal_vec normal vector of the left mirror, defining its orientation
+ */
+void unwrapVector(
+  const std::vector<double> & src_vec, std::vector<double> & plane_support_vec,
+  std::vector<double> & plane_normal_vec, std::vector<double> & mirror_right_support_vec,
+  std::vector<double> & mirror_right_normal_vec, std::vector<double> & mirror_left_support_vec,
+  std::vector<double> & mirror_left_normal_vec);
 
 };  // namespace lidarMirrorFOVReshaperTF
 

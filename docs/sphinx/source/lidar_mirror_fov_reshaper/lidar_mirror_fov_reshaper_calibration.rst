@@ -6,12 +6,60 @@ lidar_mirror_fov_reshaper_calibration
 Usage
 -------------------------------
 
+The Calibration consists of two independent calibration steps:
+
+1. Calibration of the mirror positions
+2. Calibration of the mirror orientations
+
+Both calibration steps can be executed independently from each other and can be run based on rosbags or live data. 
+Likewise, both laserscan as well as pointcloud data can be used as input for both calibration steps.
+
+Calibration of the mirror positions
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The calibration of the mirror positions is achieved by averaging the incoming lidar-rays along a specified angle/index 
+in 3dim-euclidean space.
+
+Prerequisites
+"""""""""""""
+
+This calibration step requires the mirrors to be covered, e.g. by a piece of paper, in order to avoid any reflections.
+
+Calibration of the mirror orientations
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Prerequisites
+"""""""""""""
+
+This calibration step requires several external objects:
+
+* IR-Visualizer (in order to position the lidar-sensor relative to the calibration plane)
+* Calibration plane (e.g. a wall or other planar objects)
+* Calibration marker (either a retro-reflective marker or a hole drilled into the calibration plane)
+
+During the data acquisition, the lidar sensor must be placed in front of the calibration plane, facing the calibration marker.
+In an ideal setup, exactly one mirrored ray per mirror should hit the calibration marker (In an non-ideal setup, 
+averaging between the candidate rays is performed to extract one reference ray).
+
+The following image shows how the lidar-sensor should be placed, relative to the calibration plane:
+
+.. image:: ../images/howto_calib_placing_td_lq.jpg
+  :width: 400
+  :align: center
+  :alt: Positing of the lidar-sensor relative to the calibration plane
+
+The reason for using the reference marker is to ensure that both mirrors remain symmetrically oriented (Setups which 
+do not provide symmetrical tilted mirrors have not been researched in this work).
+
 .. code-block:: bash
 
     ros2 launch lidar_mirror_fov_reshaper_calibration lidar_mirror_fov_reshaper_calibration.launch.py
 
 Parameters
 --------------------------------
+
+The following table lists the parameters that can/must be set according to the user's lidar-mirror setup:
+
 .. list-table:: lidar_mirror_fov_reshaper_calibration Configuration-Parameters
   :header-rows: 1
   :widths: 20 50 30
@@ -91,9 +139,7 @@ Parameters
   * - optimization.iter_max
     - The maximum number of iterations used as a stopping criterion in the optimization method.
     - 1000
-  * - optimization.adaptive_stepsize
-    - If true, the step size will be adaptive, and decrease over time.
-    - false
+
   * - optimization.opt_mirror_orientation
     - If true, the mirror orientation will be optimized/calibrated.
     - true
@@ -115,9 +161,6 @@ Parameters
   * - optimization.optimized_params_file
     - The file name of the optimized/calibrated parameters. Assumed to be a .csv file.
     - "lmfrc_results.csv"
-  * - optimization.optimized_params_out_dir
-    - The directory in which the files related to the optimization/calibration will be stored. Assumes the write of either the optimized parameters or the optimization history.
-    - "/my_out_dir/"
   * - optimization.verbose 
     - Level of verbosity. 0 = no output, 1 = minimal output, 2 = detailed output
     - 0
@@ -214,12 +257,6 @@ Parameters
   * - mirror_left.mirror_safety_bufferzone_size
     - The size of the mirror safety buffer zone.
     - 1
-  * - mirror_left.auto_define_start_angle
-    - If true, the start angle will be automatically defined.
-    - false
-  * - mirror_left.auto_define_end_angle
-    - If true, the end angle will be automatically defined.
-    - false
   * - mirror_left.auto_define_angle_mode
     - 0 = via slope of distance values; 1 = avg_distance threshold; ONLY applied if auto_define_{start||end}_angle == true
     - 0
@@ -247,12 +284,6 @@ Parameters
   * - mirror_right.mirror_safety_bufferzone_size
     - The size of the mirror safety buffer zone.
     - 1
-  * - mirror_right.auto_define_start_angle
-    - If true, the start angle will be automatically defined.
-    - true
-  * - mirror_right.auto_define_end_angle
-    - If true, the end angle will be automatically defined.
-    - true
   * - mirror_right.auto_define_angle_mode
     - 0 = via slope of distance values; 1 = avg_distance threshold; ONLY applied if auto_define_{start||end}_angle == true
     - 0

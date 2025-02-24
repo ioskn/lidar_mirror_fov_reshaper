@@ -26,7 +26,7 @@
     # calculated a priori via optimization (see https://github.com/ioskn/lidar_mirror_fov_reshaper/tree/main/lidar_mirror_fov_reshaper_calibration)
     # known from a given CAD model
     mirror_left:
-      start_angle: 100.0 # [deg], int
+      start_angle: 105.0 # [deg], int
       end_angle: 125.0 # [deg], int
       normal_vec: [0.39866, -0.33, -0.335313]
       support_vec: [-0.028539, 0.070636, 0.0]

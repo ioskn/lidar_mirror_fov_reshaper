@@ -103,22 +103,19 @@ private:
    */
   void setNaNAtIndices(pcl::PointCloud<pcl::PointXYZI> * cloud, pcl::PointIndices * indices);
 
-  // Subscriber
   rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr laser_sub_;
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr pointcloud_sub_;
 
-  // Publisher
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pointcloud_transformed_all_pub_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pointcloud_left_transformed_pub_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pointcloud_right_transformed_pub_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pointcloud_front_pub_;
 
-  // Tf utils
   std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
   laser_geometry::LaserProjection projector_;
 
-  // config parameters
+  // config params
   std::string laser_topic_;
   std::string laser_frame_;
   double laser_angle_min_;
