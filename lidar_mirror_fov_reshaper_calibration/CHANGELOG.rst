@@ -2,5 +2,5 @@
 Changelog for package lidar_mirror_fov_reshaper_calibration
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+1.0.0 (2025-02-26)
+------------------
